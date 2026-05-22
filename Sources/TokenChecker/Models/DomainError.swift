@@ -3,6 +3,7 @@ import Foundation
 enum DomainError: Error, Equatable, LocalizedError, Sendable {
     case keychainTokenMissing
     case anthropicUnauthorized
+    case anthropicRateLimited(retryAfter: TimeInterval?)
     case anthropicHTTP(status: Int)
     case codexCLINotFound
     case codexProcessExited
@@ -17,6 +18,12 @@ enum DomainError: Error, Equatable, LocalizedError, Sendable {
             return "Claude Code の OAuth トークンが Keychain に見つかりません。ターミナルで `claude login` を実行してください。"
         case .anthropicUnauthorized:
             return "Anthropic からの認証エラー (401)。`claude login` で再ログインしてください。"
+        case .anthropicRateLimited(let retryAfter):
+            if let sec = retryAfter {
+                let mins = max(1, Int((sec / 60).rounded()))
+                return "Anthropic API のレート制限に達しました。約 \(mins) 分後に自動で再試行します。"
+            }
+            return "Anthropic API のレート制限 (429)。次回ポーリングまで待機します。"
         case .anthropicHTTP(let status):
             return "Anthropic API エラー (status \(status))"
         case .codexCLINotFound:

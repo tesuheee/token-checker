@@ -270,57 +270,73 @@ struct InitializeParams: Encodable, Sendable {
     )
 }
 
-/// `account/rateLimits/read` のレスポンス（ラフな構造 — bucket 配列を抜き出して使う）。
+/// `account/rateLimits/read` のレスポンス。
+///
+/// 実際の構造（codex-usage-menu のテストフィクスチャから確認）:
+/// ```json
+/// {
+///   "rateLimits": {
+///     "limitId": "codex",
+///     "primary":   { "usedPercent": 25, "windowDurationMins": 300,   "resetsAt": 1760000000 },
+///     "secondary": { "usedPercent": 28, "windowDurationMins": 10080, "resetsAt": 1760604800 },
+///     "planType": "pro"
+///   },
+///   "rateLimitsByLimitId": { "codex": { ... 同じ構造 ... } }
+/// }
+/// ```
+///
+/// - JSON キーは camelCase（snake_case ではない）
+/// - `usedPercent` は **0〜100 の Int**
+/// - `resetsAt` は **Unix epoch 秒の Int64**
+/// - `windowDurationMins`: 300 = 5 時間、10080 = 週次
 struct CodexRateLimitsDTO: Decodable, Sendable {
-    let buckets: [Bucket]?
-    let rateLimitWindows: [Bucket]?
-    let rateLimits: [Bucket]?
+    let rateLimits: RateLimitSnapshot?
+    let rateLimitsByLimitId: [String: RateLimitSnapshot]?
 
-    enum CodingKeys: String, CodingKey {
-        case buckets
-        case rateLimitWindows = "rate_limit_windows"
-        case rateLimits = "rate_limits"
+    struct RateLimitSnapshot: Decodable, Sendable {
+        let limitId: String?
+        let primary: Window?
+        let secondary: Window?
+        let planType: String?
     }
 
-    /// 名前が揺れることに備えて全候補をマージ。
-    var allBuckets: [Bucket] {
-        (buckets ?? []) + (rateLimitWindows ?? []) + (rateLimits ?? [])
-    }
-
-    struct Bucket: Decodable, Sendable {
-        let windowMinutes: Int?
-        let utilization: Double?
-        let resetsAt: String?
-
-        enum CodingKeys: String, CodingKey {
-            case windowMinutes = "window_minutes"
-            case utilization
-            case resetsAt = "resets_at"
-        }
+    struct Window: Decodable, Sendable {
+        let usedPercent: Int?
+        let windowDurationMins: Int64?
+        let resetsAt: Int64?
     }
 }
 
 extension CodexRateLimitsDTO {
-    /// 5h (300 分) バケットを抽出して RateLimit に変換。
+    /// 5h (300 分) ウィンドウを抽出。
     func fiveHourRateLimit() -> RateLimit? {
-        rateLimit(forWindow: 300)
+        window(forDurationMins: 300).map(Self.toRateLimit)
     }
 
-    /// 週次 (10080 分) バケットを抽出。
+    /// 週次 (10080 分) ウィンドウを抽出。
     func weeklyRateLimit() -> RateLimit? {
-        rateLimit(forWindow: 10080)
+        window(forDurationMins: 10080).map(Self.toRateLimit)
     }
 
-    private func rateLimit(forWindow minutes: Int) -> RateLimit? {
-        guard let bucket = allBuckets.first(where: { $0.windowMinutes == minutes }),
-              let utilization = bucket.utilization,
-              let resetsAt = bucket.resetsAt,
-              let date = ISO8601DateFormatter.standard.date(from: resetsAt)
-                          ?? ISO8601DateFormatter.withFractional.date(from: resetsAt) else {
-            return nil
+    /// 全 snapshot から、指定分数のウィンドウを探す。primary/secondary 両方見る。
+    private func window(forDurationMins minutes: Int64) -> Window? {
+        var candidates: [Window] = []
+        if let snap = rateLimits {
+            if let p = snap.primary   { candidates.append(p) }
+            if let s = snap.secondary { candidates.append(s) }
         }
-        // Codex は 0.0〜1.0 で返す前提（仕様未確定なので念のため >1 にも対応）
-        let normalized = utilization > 1.5 ? utilization / 100.0 : utilization
-        return RateLimit(utilization: normalized, resetsAt: date)
+        for snap in (rateLimitsByLimitId ?? [:]).values {
+            if let p = snap.primary   { candidates.append(p) }
+            if let s = snap.secondary { candidates.append(s) }
+        }
+        return candidates.first(where: { $0.windowDurationMins == minutes })
+    }
+
+    private static func toRateLimit(_ window: Window) -> RateLimit {
+        let percent = Double(window.usedPercent ?? 0)
+        // Window モデル内の usedPercent は 0-100 の Int なので /100 で 0.0-1.0 化
+        let utilization = max(0, percent / 100.0)
+        let date = Date(timeIntervalSince1970: TimeInterval(window.resetsAt ?? 0))
+        return RateLimit(utilization: utilization, resetsAt: date)
     }
 }

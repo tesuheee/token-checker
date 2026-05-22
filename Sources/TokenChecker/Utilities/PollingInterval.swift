@@ -20,5 +20,7 @@ enum PollingInterval: Int, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
-    static let `default`: PollingInterval = .min1
+    /// Anthropic OAuth usage エンドポイントの暗黙レートリミットを考慮して 5 分をデフォルトに。
+    /// 値表示用としては十分で、`oauth/usage` への過剰アクセスを避けられる。
+    static let `default`: PollingInterval = .min5
 }

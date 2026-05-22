@@ -22,14 +22,24 @@ struct MenuBarLabel: View {
         let codex = utilization(from: viewModel.snapshot.codex)
         let content = HStack(spacing: 6) {
             HStack(spacing: 2) {
-                DonutChartView(value: claude ?? 0, size: 14, lineWidth: 3)
+                DonutChartView(
+                    value: claude ?? 0,
+                    size: 18,
+                    lineWidth: 3,
+                    centerSymbol: "sparkles"   // Claude のロゴ代わり（ポップオーバーと統一）
+                )
                 Text(percentLabel(claude))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
             }
             HStack(spacing: 2) {
-                DonutChartView(value: codex ?? 0, size: 14, lineWidth: 3)
+                DonutChartView(
+                    value: codex ?? 0,
+                    size: 18,
+                    lineWidth: 3,
+                    centerSymbol: "chevron.left.forwardslash.chevron.right"   // Codex
+                )
                 Text(percentLabel(codex))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
             }
         }
         .padding(.horizontal, 2)
