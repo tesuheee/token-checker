@@ -8,7 +8,7 @@ macOS のメニューバーに Claude Code と Codex の使用率を常時表示
 
 ## 概要
 
-ターミナルで `claude login` / `codex login` を完了済みのアカウントに対し、Anthropic の OAuth エンドポイントおよび `codex app-server` の JSON-RPC を経由してレート制限情報を取得する。取得結果はメニューバーに 2 個のドーナツチャートと数値で表示され、クリックでポップオーバーに 5 時間ウィンドウと週次ウィンドウの詳細を展開する。アプリケーション本体は認証情報を保持せず、API キーも要しない。
+ターミナルで `claude login` / `codex login` を完了済みのアカウントに対し、Anthropic の OAuth エンドポイントおよび `codex app-server` の JSON-RPC を経由してレート制限情報を取得する。取得結果はメニューバーに 2 個のドーナツチャートと数値で表示され、クリックでポップオーバーに 5 時間ウィンドウと週次ウィンドウの詳細を展開する。
 
 ## 動作要件
 
@@ -28,9 +28,6 @@ cd ~/Documents/program/token-checker
 ./Scripts/build.sh --install
 ```
 
-リリースビルド、`.app` バンドル組立、ad-hoc 署名、`/Applications` への配置を 1 コマンドで実施する。ユーザ領域に配置する場合は `--install` を `--user-install` に置き換える。
-
-初回起動時は Gatekeeper の警告が表示される。`/Applications/TokenChecker.app` を右クリックし `開く → 開く` で一度許可することで以降は通常起動する。
 
 ## 使用方法
 
@@ -43,7 +40,6 @@ codex login
 
 いずれもブラウザの OAuth フローを経て、Keychain または `~/.codex/auth.json` にトークンが保存される。アプリは保存されたトークンを参照するため、ログインは CLI 側で 1 度行えばよい。
 
-アプリを起動するとメニューバー右側にドーナツが 2 個並ぶ。左が Claude Code (`✦`)、右が Codex (`</>`) の 5 時間ウィンドウ使用率を示し、色は使用率に応じて緑・橙・赤に変化する。
 
 <p align="center">
   <img src=".github/assets/popover.svg" alt="ポップオーバー表示" width="320"/>
@@ -62,12 +58,10 @@ codex login
 
 ```bash
 killall TokenChecker
-rm -rf /Applications/TokenChecker.app
 defaults delete com.token-checker.app 2>/dev/null
 ```
 
 ## ライセンスと謝辞
 データ取得手法は次のオープンソース実装を参考にした。
-
 - [s-age/ccmeter](https://github.com/s-age/ccmeter) — Anthropic OAuth usage エンドポイントの利用方法
 - [ml0-1337/codex-usage-menu](https://github.com/ml0-1337/codex-usage-menu) — `codex app-server` JSON-RPC スキーマ
