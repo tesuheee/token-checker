@@ -19,14 +19,10 @@ actor CodexAppServerClient {
     private var lineBuffer = JSONRPCLineBuffer()
 
     init(
-        candidates: [String] = [
-            "/opt/homebrew/bin/codex",
-            "/usr/local/bin/codex",
-            "/usr/bin/codex",
-        ],
+        candidates: [String]? = nil,
         requestTimeout: TimeInterval = 8
     ) {
-        self.candidates = candidates
+        self.candidates = candidates ?? Self.defaultCandidates()
         self.requestTimeout = requestTimeout
     }
 
@@ -35,7 +31,7 @@ actor CodexAppServerClient {
     func start() async throws {
         if process != nil { return }
 
-        guard let executable = resolveExecutable() else {
+        guard let executable = await resolveExecutable() else {
             throw DomainError.codexCLINotFound
         }
 
@@ -115,10 +111,126 @@ actor CodexAppServerClient {
 
     // MARK: - Internals
 
-    private func resolveExecutable() -> URL? {
-        candidates
-            .first { FileManager.default.isExecutableFile(atPath: $0) }
-            .map { URL(fileURLWithPath: $0) }
+    /// codex バイナリの絶対パスを決定する。
+    ///
+    /// 解決順序:
+    ///   1. UserDefaults `codexPath` … `defaults write <bundle-id> codexPath /full/path`
+    ///      で設定できる手動 escape hatch。未知の Node 環境管理ツールでも最終的に救える。
+    ///   2. 既知の候補パス（Homebrew / nodebrew / volta / bun / asdf / nvm / fnm）。
+    ///      シェル spawn を伴わないので最速。
+    ///   3. ユーザーのログインシェル経由で `command -v codex`。
+    ///      上記で見つからない場合の最終手段。3 秒でタイムアウト。
+    ///      `.zshrc` 等を source する副作用に注意。
+    private func resolveExecutable() async -> URL? {
+        if let userPath = UserDefaults.standard.string(forKey: "codexPath"),
+           !userPath.isEmpty,
+           FileManager.default.isExecutableFile(atPath: userPath) {
+            return URL(fileURLWithPath: userPath)
+        }
+
+        if let known = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+            return URL(fileURLWithPath: known)
+        }
+
+        if let resolved = await Self.resolveViaShell() {
+            return URL(fileURLWithPath: resolved)
+        }
+
+        return nil
+    }
+
+    /// 既知のインストール先候補。nvm / fnm はバージョン番号が中間ディレクトリに入るので
+    /// 実在するエントリを降順に展開（新しい Node バージョンを優先）。
+    private static func defaultCandidates() -> [String] {
+        let home = NSHomeDirectory()
+        var paths: [String] = [
+            "/opt/homebrew/bin/codex",
+            "/usr/local/bin/codex",
+            "/usr/bin/codex",
+            "\(home)/.nodebrew/current/bin/codex",
+            "\(home)/.volta/bin/codex",
+            "\(home)/.bun/bin/codex",
+            "\(home)/.asdf/shims/codex",
+        ]
+
+        paths.append(contentsOf: versionedCandidates(
+            base: "\(home)/.nvm/versions/node",
+            suffix: "bin/codex"
+        ))
+
+        paths.append(contentsOf: versionedCandidates(
+            base: "\(home)/.local/share/fnm/node-versions",
+            suffix: "installation/bin/codex"
+        ))
+
+        return paths
+    }
+
+    private static func versionedCandidates(base: String, suffix: String) -> [String] {
+        guard let entries = try? FileManager.default.contentsOfDirectory(atPath: base) else {
+            return []
+        }
+        // 辞書順だと "v9.x" が "v22.x" より「大きい」になり古い Node を優先してしまう。
+        // `.numeric` (locale 非依存) で数値部分を整数として比較し、semver 順で
+        // 新しい版を先頭に。プレリリースタグ付き (e.g. "v22.0.0-rc.1") は
+        // 正規リリースより後ろに送って rc ビルドを優先しないようにする。
+        return entries
+            .sorted { lhs, rhs in
+                let lhsPre = lhs.contains("-")
+                let rhsPre = rhs.contains("-")
+                if lhsPre != rhsPre { return rhsPre }
+                return lhs.compare(rhs, options: .numeric, locale: nil) == .orderedDescending
+            }
+            .map { "\(base)/\($0)/\(suffix)" }
+    }
+
+    /// ログインシェル経由で `command -v codex` を実行して絶対パスを得る。
+    /// `command -v` は alias / function の場合に `/` で始まらない文字列を返すため、
+    /// 出力行のうち `/` で始まり、かつ executable file である最後の行のみ採用する。
+    private static func resolveViaShell() async -> String? {
+        let shellPath = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        guard FileManager.default.isExecutableFile(atPath: shellPath) else { return nil }
+
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: shellPath)
+        proc.arguments = ["-ilc", "command -v codex"]
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = errPipe
+
+        return await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
+            proc.terminationHandler = { _ in
+                let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+                _ = errPipe.fileHandleForReading.readDataToEndOfFile()
+                let raw = String(data: data, encoding: .utf8) ?? ""
+                let path = raw
+                    .split(separator: "\n")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .last { $0.hasPrefix("/") }
+
+                if let path, FileManager.default.isExecutableFile(atPath: path) {
+                    continuation.resume(returning: path)
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
+
+            do {
+                try proc.run()
+            } catch {
+                continuation.resume(returning: nil)
+                return
+            }
+
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                if proc.isRunning {
+                    proc.terminate()
+                }
+            }
+        }
     }
 
     /// 子プロセス (`codex app-server`) に渡す環境変数を最小限の whitelist で構築する。
