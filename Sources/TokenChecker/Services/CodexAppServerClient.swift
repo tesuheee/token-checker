@@ -1,4 +1,5 @@
 @preconcurrency import Foundation
+import OSLog
 
 /// `codex app-server` を spawn して JSON-RPC で会話する actor。
 ///
@@ -17,33 +18,88 @@ actor CodexAppServerClient {
     private var stdout: Pipe?
     private var stderr: Pipe?
     private var lineBuffer = JSONRPCLineBuffer()
+    /// `codex --version` の出力は actor ライフタイム中変わらないため、
+    /// 最初に検出した起動フローを保持して再起動時の subprocess spawn を避ける。
+    private var cachedLaunchFlow: CodexLaunchFlow?
 
     init(
-        candidates: [String] = [
-            "/opt/homebrew/bin/codex",
-            "/usr/local/bin/codex",
-            "/usr/bin/codex",
-        ],
+        candidates: [String]? = nil,
         requestTimeout: TimeInterval = 8
     ) {
-        self.candidates = candidates
+        self.candidates = candidates ?? Self.defaultCandidates()
         self.requestTimeout = requestTimeout
     }
 
     // MARK: - Lifecycle
 
+    /// codex の起動方法は CLI のバージョンによって異なる。バージョン文字列を解析する
+    /// 代わりに、複数の起動パターンを **順に試して** 最初に成立したものを採用する
+    /// try-and-fallback 方式を採る。これにより codex 側がさらにコマンド体系を
+    /// 変えてきても、新パターンを `CodexLaunchFlow.defaultProbeOrder` に足すだけで
+    /// 対応できる (バージョン番号と紐付かない)。
+    ///
+    /// キャッシュ: 一度動いたフローを actor stored property に保持し、次回 `start()` 時
+    /// は最優先で試す。失敗時のみ残りのパターンへフォールバックして自己修復する。
     func start() async throws {
         if process != nil { return }
 
-        guard let executable = resolveExecutable() else {
+        guard let executable = await resolveExecutable() else {
             throw DomainError.codexCLINotFound
+        }
+
+        let probeOrder = makeProbeOrder()
+
+        var lastError: Error?
+        for attempt in probeOrder {
+            do {
+                try await launch(executable: executable, attempt: attempt)
+                if cachedLaunchFlow != attempt {
+                    Logger.codex.info("launch succeeded with \(String(describing: attempt), privacy: .public)")
+                    cachedLaunchFlow = attempt
+                }
+                return
+            } catch {
+                Logger.codex.notice("launch attempt \(String(describing: attempt), privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+                lastError = error
+                // 中途半端な状態 (process が立っている / pipes が開いている) を確実に
+                // 掃除してから次の attempt に移る。handleProcessTerminated が先に
+                // 走っていれば stop() はほぼ no-op だが安全側で常に呼ぶ。
+                stop()
+                continue
+            }
+        }
+
+        throw lastError ?? DomainError.codexProcessExited
+    }
+
+    /// キャッシュがあればそれを最優先、続いて残りの既定パターンを並べた probe 順を返す。
+    private func makeProbeOrder() -> [CodexLaunchFlow] {
+        let defaults = CodexLaunchFlow.defaultProbeOrder
+        guard let cached = cachedLaunchFlow else { return defaults }
+        return [cached] + defaults.filter { $0 != cached }
+    }
+
+    /// 単一の起動パターンを試行する。失敗時は throw、成功時は `self.process` 等が
+    /// セットされ initialize handshake まで完了した状態で返る。
+    private func launch(executable: URL, attempt: CodexLaunchFlow) async throws {
+        // 旧 attempt の readabilityHandler が既に dispatch 済みのデータブロックを actor に
+        // hop で持ち込みうる (stop() でハンドラを nil にしても、カーネル側が dispatch
+        // した直後のブロックは取り消せない)。新 attempt の lineBuffer に残滓が混入すると
+        // 後続 RPC の解析が乱れるため、defense-in-depth で冒頭でも消す。
+        lineBuffer.removeAll()
+
+        if attempt == .daemonAndProxy {
+            try await Self.ensureDaemon(executable: executable)
         }
 
         let proc = Process()
         let inP = Pipe(), outP = Pipe(), errP = Pipe()
 
         proc.executableURL = executable
-        proc.arguments = ["app-server"]
+        // v0.130 以前: `codex app-server` 単体で stdio JSON-RPC サーバ
+        // v0.133 以降: app-server は引数なし起動が廃止され、`app-server daemon start` で
+        //              daemon を立て、`app-server proxy` が stdio bytes をリレーする
+        proc.arguments = (attempt == .daemonAndProxy) ? ["app-server", "proxy"] : ["app-server"]
         proc.environment = Self.childEnvironment(from: ProcessInfo.processInfo.environment)
         proc.standardInput = inP
         proc.standardOutput = outP
@@ -115,10 +171,194 @@ actor CodexAppServerClient {
 
     // MARK: - Internals
 
-    private func resolveExecutable() -> URL? {
-        candidates
-            .first { FileManager.default.isExecutableFile(atPath: $0) }
-            .map { URL(fileURLWithPath: $0) }
+    /// codex バイナリの絶対パスを決定する。
+    ///
+    /// 解決順序:
+    ///   1. UserDefaults `codexPath` … `defaults write <bundle-id> codexPath /full/path`
+    ///      で設定できる手動 escape hatch。未知の Node 環境管理ツールでも最終的に救える。
+    ///   2. 既知の候補パス（Homebrew / nodebrew / volta / bun / asdf / nvm / fnm）。
+    ///      シェル spawn を伴わないので最速。
+    ///   3. ユーザーのログインシェル経由で `command -v codex`。
+    ///      上記で見つからない場合の最終手段。3 秒でタイムアウト。
+    ///      `.zshrc` 等を source する副作用に注意。
+    private func resolveExecutable() async -> URL? {
+        if let userPath = UserDefaults.standard.string(forKey: "codexPath"),
+           !userPath.isEmpty,
+           FileManager.default.isExecutableFile(atPath: userPath) {
+            return URL(fileURLWithPath: userPath)
+        }
+
+        if let known = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+            return URL(fileURLWithPath: known)
+        }
+
+        if let resolved = await Self.resolveViaShell() {
+            return URL(fileURLWithPath: resolved)
+        }
+
+        return nil
+    }
+
+    /// 既知のインストール先候補。nvm / fnm はバージョン番号が中間ディレクトリに入るので
+    /// 実在するエントリを降順に展開（新しい Node バージョンを優先）。
+    private static func defaultCandidates() -> [String] {
+        let home = NSHomeDirectory()
+        var paths: [String] = [
+            "/opt/homebrew/bin/codex",
+            "/usr/local/bin/codex",
+            "/usr/bin/codex",
+            "\(home)/.nodebrew/current/bin/codex",
+            "\(home)/.volta/bin/codex",
+            "\(home)/.bun/bin/codex",
+            "\(home)/.asdf/shims/codex",
+        ]
+
+        paths.append(contentsOf: versionedCandidates(
+            base: "\(home)/.nvm/versions/node",
+            suffix: "bin/codex"
+        ))
+
+        paths.append(contentsOf: versionedCandidates(
+            base: "\(home)/.local/share/fnm/node-versions",
+            suffix: "installation/bin/codex"
+        ))
+
+        return paths
+    }
+
+    private static func versionedCandidates(base: String, suffix: String) -> [String] {
+        guard let entries = try? FileManager.default.contentsOfDirectory(atPath: base) else {
+            return []
+        }
+        // 辞書順だと "v9.x" が "v22.x" より「大きい」になり古い Node を優先してしまう。
+        // `.numeric` (locale 非依存) で数値部分を整数として比較し、semver 順で
+        // 新しい版を先頭に。プレリリースタグ付き (e.g. "v22.0.0-rc.1") は
+        // 正規リリースより後ろに送って rc ビルドを優先しないようにする。
+        return entries
+            .sorted { lhs, rhs in
+                let lhsPre = lhs.contains("-")
+                let rhsPre = rhs.contains("-")
+                if lhsPre != rhsPre { return rhsPre }
+                return lhs.compare(rhs, options: .numeric, locale: nil) == .orderedDescending
+            }
+            .map { "\(base)/\($0)/\(suffix)" }
+    }
+
+    /// ログインシェル経由で `command -v codex` を実行して絶対パスを得る。
+    /// `command -v` は alias / function の場合に `/` で始まらない文字列を返すため、
+    /// 出力行のうち `/` で始まり、かつ executable file である最後の行のみ採用する。
+    private static func resolveViaShell() async -> String? {
+        let shellPath = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        guard FileManager.default.isExecutableFile(atPath: shellPath) else { return nil }
+
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: shellPath)
+        proc.arguments = ["-ilc", "command -v codex"]
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = errPipe
+
+        return await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
+            proc.terminationHandler = { _ in
+                let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+                _ = errPipe.fileHandleForReading.readDataToEndOfFile()
+                let raw = String(data: data, encoding: .utf8) ?? ""
+                let path = raw
+                    .split(separator: "\n")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .last { $0.hasPrefix("/") }
+
+                if let path, FileManager.default.isExecutableFile(atPath: path) {
+                    continuation.resume(returning: path)
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
+
+            do {
+                try proc.run()
+            } catch {
+                continuation.resume(returning: nil)
+                return
+            }
+
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                if proc.isRunning {
+                    proc.terminate()
+                }
+            }
+        }
+    }
+
+    // MARK: - v0.133 daemon bootstrap
+
+    /// v0.133+ で `codex app-server daemon start` を実行し daemon を確実に起動する。
+    /// Issue #2 報告者の記述に従う (`app-server` のサブコマンドとして `daemon` が追加された)。
+    /// 「準備完了まで待機して exit 0」想定で、既起動の場合も idempotent に成功する想定。
+    /// タイムアウト 5 秒。
+    private static func ensureDaemon(executable: URL) async throws {
+        let proc = Process()
+        proc.executableURL = executable
+        proc.arguments = ["app-server", "daemon", "start"]
+        proc.environment = childEnvironment(from: ProcessInfo.processInfo.environment)
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = errPipe
+
+        enum Outcome {
+            case ok
+            case timedOut
+            case badExit(Int32, String)
+            case spawnFailed(String)
+        }
+
+        let outcome: Outcome = await withCheckedContinuation { (cont: CheckedContinuation<Outcome, Never>) in
+            proc.terminationHandler = { p in
+                let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                _ = outPipe.fileHandleForReading.readDataToEndOfFile()
+                let stderr = String(data: errData, encoding: .utf8) ?? ""
+                // タイムアウト時は自前で `terminate()` を呼ぶため、シグナル終了として観測される。
+                // ここでは `.timedOut` を返し、報告メッセージを「exit=15」より明確な
+                // 「タイムアウト」表記に切り替える。
+                if p.terminationReason == .uncaughtSignal {
+                    cont.resume(returning: .timedOut)
+                } else if p.terminationStatus == 0 {
+                    cont.resume(returning: .ok)
+                } else {
+                    cont.resume(returning: .badExit(p.terminationStatus, stderr))
+                }
+            }
+            do {
+                try proc.run()
+            } catch {
+                cont.resume(returning: .spawnFailed(error.localizedDescription))
+                return
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                if proc.isRunning { proc.terminate() }
+            }
+        }
+
+        switch outcome {
+        case .ok:
+            return
+        case .timedOut:
+            Logger.codex.error("app-server daemon start timed out after 5s")
+            throw DomainError.network("codex app-server daemon start がタイムアウトしました (5s)")
+        case .badExit(let code, let stderr):
+            let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            Logger.codex.error("app-server daemon start failed (exit=\(code, privacy: .public)): \(detail, privacy: .public)")
+            throw DomainError.network("codex app-server daemon start failed (exit=\(code))")
+        case .spawnFailed(let detail):
+            Logger.codex.error("app-server daemon start spawn failed: \(detail, privacy: .public)")
+            throw DomainError.network("codex app-server daemon start spawn failed: \(detail)")
+        }
     }
 
     /// 子プロセス (`codex app-server`) に渡す環境変数を最小限の whitelist で構築する。
@@ -361,4 +601,24 @@ extension CodexRateLimitsDTO {
         let date = Date(timeIntervalSince1970: TimeInterval(resets))
         return RateLimit(utilization: utilization, resetsAt: date)
     }
+}
+
+// MARK: - Codex CLI version model
+
+/// `codex app-server` の起動方法は CLI のバージョンで異なる。
+///
+/// バージョン文字列を解析する代わりに `defaultProbeOrder` を順に試す
+/// try-and-fallback 方式 (CodexAppServerClient.start() を参照)。新しいパターンが
+/// 出てきたら enum と `defaultProbeOrder` に足すだけで追従できる。
+fileprivate enum CodexLaunchFlow: Sendable {
+    /// v0.130 まで: `codex app-server` 単体で stdio JSON-RPC サーバ。
+    case stdio
+    /// v0.133 以降: `codex app-server daemon start` で daemon を起動し、
+    /// `codex app-server proxy` で stdio をリレー。
+    case daemonAndProxy
+
+    /// 試行順序。新しい方を先頭に置く (将来 v0.150 等で別の方式が来たらここに追加)。
+    /// v0.130 ユーザーの初回起動は先頭の失敗で 1〜2 秒遅れるが、actor 内キャッシュで
+    /// 2 回目以降は即座に成功パターンが選ばれる。
+    static let defaultProbeOrder: [CodexLaunchFlow] = [.daemonAndProxy, .stdio]
 }
