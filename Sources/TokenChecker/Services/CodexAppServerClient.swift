@@ -32,6 +32,14 @@ actor CodexAppServerClient {
 
     // MARK: - Lifecycle
 
+    /// codex の起動方法は CLI のバージョンによって異なる。バージョン文字列を解析する
+    /// 代わりに、複数の起動パターンを **順に試して** 最初に成立したものを採用する
+    /// try-and-fallback 方式を採る。これにより codex 側がさらにコマンド体系を
+    /// 変えてきても、新パターンを `CodexLaunchFlow.defaultProbeOrder` に足すだけで
+    /// 対応できる (バージョン番号と紐付かない)。
+    ///
+    /// キャッシュ: 一度動いたフローを actor stored property に保持し、次回 `start()` 時
+    /// は最優先で試す。失敗時のみ残りのパターンへフォールバックして自己修復する。
     func start() async throws {
         if process != nil { return }
 
@@ -39,16 +47,48 @@ actor CodexAppServerClient {
             throw DomainError.codexCLINotFound
         }
 
-        let flow: CodexLaunchFlow
-        if let cached = cachedLaunchFlow {
-            flow = cached
-        } else {
-            flow = await Self.detectLaunchFlow(executable: executable)
-            cachedLaunchFlow = flow
-            Logger.codex.info("launch flow: \(String(describing: flow), privacy: .public)")
+        let probeOrder = makeProbeOrder()
+
+        var lastError: Error?
+        for attempt in probeOrder {
+            do {
+                try await launch(executable: executable, attempt: attempt)
+                if cachedLaunchFlow != attempt {
+                    Logger.codex.info("launch succeeded with \(String(describing: attempt), privacy: .public)")
+                    cachedLaunchFlow = attempt
+                }
+                return
+            } catch {
+                Logger.codex.notice("launch attempt \(String(describing: attempt), privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+                lastError = error
+                // 中途半端な状態 (process が立っている / pipes が開いている) を確実に
+                // 掃除してから次の attempt に移る。handleProcessTerminated が先に
+                // 走っていれば stop() はほぼ no-op だが安全側で常に呼ぶ。
+                stop()
+                continue
+            }
         }
 
-        if flow == .daemonAndProxy {
+        throw lastError ?? DomainError.codexProcessExited
+    }
+
+    /// キャッシュがあればそれを最優先、続いて残りの既定パターンを並べた probe 順を返す。
+    private func makeProbeOrder() -> [CodexLaunchFlow] {
+        let defaults = CodexLaunchFlow.defaultProbeOrder
+        guard let cached = cachedLaunchFlow else { return defaults }
+        return [cached] + defaults.filter { $0 != cached }
+    }
+
+    /// 単一の起動パターンを試行する。失敗時は throw、成功時は `self.process` 等が
+    /// セットされ initialize handshake まで完了した状態で返る。
+    private func launch(executable: URL, attempt: CodexLaunchFlow) async throws {
+        // 旧 attempt の readabilityHandler が既に dispatch 済みのデータブロックを actor に
+        // hop で持ち込みうる (stop() でハンドラを nil にしても、カーネル側が dispatch
+        // した直後のブロックは取り消せない)。新 attempt の lineBuffer に残滓が混入すると
+        // 後続 RPC の解析が乱れるため、defense-in-depth で冒頭でも消す。
+        lineBuffer.removeAll()
+
+        if attempt == .daemonAndProxy {
             try await Self.ensureDaemon(executable: executable)
         }
 
@@ -59,7 +99,7 @@ actor CodexAppServerClient {
         // v0.130 以前: `codex app-server` 単体で stdio JSON-RPC サーバ
         // v0.133 以降: app-server は引数なし起動が廃止され、`remote-control start` で
         //              daemon を立て、`app-server proxy` が stdio bytes をリレーする
-        proc.arguments = (flow == .daemonAndProxy) ? ["app-server", "proxy"] : ["app-server"]
+        proc.arguments = (attempt == .daemonAndProxy) ? ["app-server", "proxy"] : ["app-server"]
         proc.environment = Self.childEnvironment(from: ProcessInfo.processInfo.environment)
         proc.standardInput = inP
         proc.standardOutput = outP
@@ -253,58 +293,7 @@ actor CodexAppServerClient {
         }
     }
 
-    // MARK: - Launch flow detection (v0.133 breaking change)
-
-    /// codex CLI v0.133 で `codex app-server` (引数なし) が stdio JSON-RPC サーバとして
-    /// 起動できなくなった (Issue #2 part 1)。新仕様では:
-    ///   - `codex remote-control start` … daemon を起動 (idempotent / 既起動なら no-op 成功)
-    ///   - `codex app-server proxy`    … stdio bytes を daemon の制御 socket にリレー
-    /// の二段構成が必要。バージョンを判定して使用フローを切り替える。
-    ///
-    /// 判定不能 (タイムアウト / 出力解析失敗) の場合は安全側に倒して旧フロー (stdio) を返す。
-    /// 旧フローは v0.130 で動作実績あり、v0.133 ではどのみち失敗 → restart ループに乗る。
-    private static func detectLaunchFlow(executable: URL) async -> CodexLaunchFlow {
-        let threshold = CodexVersion(major: 0, minor: 133, patch: 0)
-        if let version = await queryVersion(executable: executable) {
-            Logger.codex.info("detected codex version: \(version.description, privacy: .public)")
-            return version >= threshold ? .daemonAndProxy : .stdio
-        }
-        Logger.codex.notice("codex version detection failed; falling back to stdio flow")
-        return .stdio
-    }
-
-    /// `codex --version` を実行してバージョンを取得する。3 秒タイムアウト。
-    /// 出力 (例: `codex-cli 0.130.0`) から `MAJOR.MINOR.PATCH` を抽出する。
-    private static func queryVersion(executable: URL) async -> CodexVersion? {
-        let proc = Process()
-        proc.executableURL = executable
-        proc.arguments = ["--version"]
-        proc.environment = childEnvironment(from: ProcessInfo.processInfo.environment)
-
-        let outPipe = Pipe()
-        let errPipe = Pipe()
-        proc.standardOutput = outPipe
-        proc.standardError = errPipe
-
-        return await withCheckedContinuation { (cont: CheckedContinuation<CodexVersion?, Never>) in
-            proc.terminationHandler = { _ in
-                let data = outPipe.fileHandleForReading.readDataToEndOfFile()
-                _ = errPipe.fileHandleForReading.readDataToEndOfFile()
-                let raw = String(data: data, encoding: .utf8) ?? ""
-                cont.resume(returning: CodexVersion.parse(raw))
-            }
-            do {
-                try proc.run()
-            } catch {
-                cont.resume(returning: nil)
-                return
-            }
-            Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                if proc.isRunning { proc.terminate() }
-            }
-        }
-    }
+    // MARK: - v0.133 daemon bootstrap
 
     /// v0.133+ で `codex remote-control start` を実行し daemon を確実に起動する。
     /// PR #22878 のセマンティクスでは「準備完了まで待機して exit 0」となる。
@@ -615,43 +604,19 @@ extension CodexRateLimitsDTO {
 
 // MARK: - Codex CLI version model
 
-/// `codex app-server` の起動方法は CLI のバージョンで分岐する。
+/// `codex app-server` の起動方法は CLI のバージョンで異なる。
+///
+/// バージョン文字列を解析する代わりに `defaultProbeOrder` を順に試す
+/// try-and-fallback 方式 (CodexAppServerClient.start() を参照)。新しいパターンが
+/// 出てきたら enum と `defaultProbeOrder` に足すだけで追従できる。
 fileprivate enum CodexLaunchFlow: Sendable {
     /// v0.130 まで: `codex app-server` 単体で stdio JSON-RPC サーバ。
     case stdio
     /// v0.133 以降: `remote-control start` で daemon を起動し、`app-server proxy` で stdio をリレー。
     case daemonAndProxy
-}
 
-fileprivate struct CodexVersion: Comparable, Sendable, CustomStringConvertible {
-    let major: Int
-    let minor: Int
-    let patch: Int
-
-    var description: String { "\(major).\(minor).\(patch)" }
-
-    /// `codex --version` の出力 (`codex-cli 0.130.0` 等) から最初の `MAJOR.MINOR.PATCH` を抽出。
-    /// プレリリースタグ (`-rc.1` 等) は無視する。抽出失敗時は nil。
-    static func parse(_ output: String) -> CodexVersion? {
-        guard let regex = try? NSRegularExpression(pattern: #"(\d+)\.(\d+)\.(\d+)"#) else {
-            return nil
-        }
-        let range = NSRange(output.startIndex..<output.endIndex, in: output)
-        guard let match = regex.firstMatch(in: output, range: range),
-              match.numberOfRanges == 4 else {
-            return nil
-        }
-        func intAt(_ idx: Int) -> Int? {
-            guard let r = Range(match.range(at: idx), in: output) else { return nil }
-            return Int(output[r])
-        }
-        guard let major = intAt(1), let minor = intAt(2), let patch = intAt(3) else {
-            return nil
-        }
-        return CodexVersion(major: major, minor: minor, patch: patch)
-    }
-
-    static func < (lhs: Self, rhs: Self) -> Bool {
-        (lhs.major, lhs.minor, lhs.patch) < (rhs.major, rhs.minor, rhs.patch)
-    }
+    /// 試行順序。新しい方を先頭に置く (将来 v0.150 等で別の方式が来たらここに追加)。
+    /// v0.130 ユーザーの初回起動は先頭の失敗で 1〜2 秒遅れるが、actor 内キャッシュで
+    /// 2 回目以降は即座に成功パターンが選ばれる。
+    static let defaultProbeOrder: [CodexLaunchFlow] = [.daemonAndProxy, .stdio]
 }
