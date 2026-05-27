@@ -1,4 +1,5 @@
 @preconcurrency import Foundation
+import OSLog
 
 /// `codex app-server` を spawn して JSON-RPC で会話する actor。
 ///
@@ -17,6 +18,9 @@ actor CodexAppServerClient {
     private var stdout: Pipe?
     private var stderr: Pipe?
     private var lineBuffer = JSONRPCLineBuffer()
+    /// `codex --version` の出力は actor ライフタイム中変わらないため、
+    /// 最初に検出した起動フローを保持して再起動時の subprocess spawn を避ける。
+    private var cachedLaunchFlow: CodexLaunchFlow?
 
     init(
         candidates: [String]? = nil,
@@ -35,11 +39,27 @@ actor CodexAppServerClient {
             throw DomainError.codexCLINotFound
         }
 
+        let flow: CodexLaunchFlow
+        if let cached = cachedLaunchFlow {
+            flow = cached
+        } else {
+            flow = await Self.detectLaunchFlow(executable: executable)
+            cachedLaunchFlow = flow
+            Logger.codex.info("launch flow: \(String(describing: flow), privacy: .public)")
+        }
+
+        if flow == .daemonAndProxy {
+            try await Self.ensureDaemon(executable: executable)
+        }
+
         let proc = Process()
         let inP = Pipe(), outP = Pipe(), errP = Pipe()
 
         proc.executableURL = executable
-        proc.arguments = ["app-server"]
+        // v0.130 以前: `codex app-server` 単体で stdio JSON-RPC サーバ
+        // v0.133 以降: app-server は引数なし起動が廃止され、`remote-control start` で
+        //              daemon を立て、`app-server proxy` が stdio bytes をリレーする
+        proc.arguments = (flow == .daemonAndProxy) ? ["app-server", "proxy"] : ["app-server"]
         proc.environment = Self.childEnvironment(from: ProcessInfo.processInfo.environment)
         proc.standardInput = inP
         proc.standardOutput = outP
@@ -230,6 +250,124 @@ actor CodexAppServerClient {
                     proc.terminate()
                 }
             }
+        }
+    }
+
+    // MARK: - Launch flow detection (v0.133 breaking change)
+
+    /// codex CLI v0.133 で `codex app-server` (引数なし) が stdio JSON-RPC サーバとして
+    /// 起動できなくなった (Issue #2 part 1)。新仕様では:
+    ///   - `codex remote-control start` … daemon を起動 (idempotent / 既起動なら no-op 成功)
+    ///   - `codex app-server proxy`    … stdio bytes を daemon の制御 socket にリレー
+    /// の二段構成が必要。バージョンを判定して使用フローを切り替える。
+    ///
+    /// 判定不能 (タイムアウト / 出力解析失敗) の場合は安全側に倒して旧フロー (stdio) を返す。
+    /// 旧フローは v0.130 で動作実績あり、v0.133 ではどのみち失敗 → restart ループに乗る。
+    private static func detectLaunchFlow(executable: URL) async -> CodexLaunchFlow {
+        let threshold = CodexVersion(major: 0, minor: 133, patch: 0)
+        if let version = await queryVersion(executable: executable) {
+            Logger.codex.info("detected codex version: \(version.description, privacy: .public)")
+            return version >= threshold ? .daemonAndProxy : .stdio
+        }
+        Logger.codex.notice("codex version detection failed; falling back to stdio flow")
+        return .stdio
+    }
+
+    /// `codex --version` を実行してバージョンを取得する。3 秒タイムアウト。
+    /// 出力 (例: `codex-cli 0.130.0`) から `MAJOR.MINOR.PATCH` を抽出する。
+    private static func queryVersion(executable: URL) async -> CodexVersion? {
+        let proc = Process()
+        proc.executableURL = executable
+        proc.arguments = ["--version"]
+        proc.environment = childEnvironment(from: ProcessInfo.processInfo.environment)
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = errPipe
+
+        return await withCheckedContinuation { (cont: CheckedContinuation<CodexVersion?, Never>) in
+            proc.terminationHandler = { _ in
+                let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+                _ = errPipe.fileHandleForReading.readDataToEndOfFile()
+                let raw = String(data: data, encoding: .utf8) ?? ""
+                cont.resume(returning: CodexVersion.parse(raw))
+            }
+            do {
+                try proc.run()
+            } catch {
+                cont.resume(returning: nil)
+                return
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                if proc.isRunning { proc.terminate() }
+            }
+        }
+    }
+
+    /// v0.133+ で `codex remote-control start` を実行し daemon を確実に起動する。
+    /// PR #22878 のセマンティクスでは「準備完了まで待機して exit 0」となる。
+    /// 既起動の場合も exit 0 で idempotent に成功するはず。タイムアウト 5 秒。
+    private static func ensureDaemon(executable: URL) async throws {
+        let proc = Process()
+        proc.executableURL = executable
+        proc.arguments = ["remote-control", "start"]
+        proc.environment = childEnvironment(from: ProcessInfo.processInfo.environment)
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = errPipe
+
+        enum Outcome {
+            case ok
+            case timedOut
+            case badExit(Int32, String)
+            case spawnFailed(String)
+        }
+
+        let outcome: Outcome = await withCheckedContinuation { (cont: CheckedContinuation<Outcome, Never>) in
+            proc.terminationHandler = { p in
+                let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                _ = outPipe.fileHandleForReading.readDataToEndOfFile()
+                let stderr = String(data: errData, encoding: .utf8) ?? ""
+                // タイムアウト時は自前で `terminate()` を呼ぶため、シグナル終了として観測される。
+                // ここでは `.timedOut` を返し、報告メッセージを「exit=15」より明確な
+                // 「タイムアウト」表記に切り替える。
+                if p.terminationReason == .uncaughtSignal {
+                    cont.resume(returning: .timedOut)
+                } else if p.terminationStatus == 0 {
+                    cont.resume(returning: .ok)
+                } else {
+                    cont.resume(returning: .badExit(p.terminationStatus, stderr))
+                }
+            }
+            do {
+                try proc.run()
+            } catch {
+                cont.resume(returning: .spawnFailed(error.localizedDescription))
+                return
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                if proc.isRunning { proc.terminate() }
+            }
+        }
+
+        switch outcome {
+        case .ok:
+            return
+        case .timedOut:
+            Logger.codex.error("remote-control start timed out after 5s")
+            throw DomainError.network("codex remote-control start がタイムアウトしました (5s)")
+        case .badExit(let code, let stderr):
+            let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            Logger.codex.error("remote-control start failed (exit=\(code, privacy: .public)): \(detail, privacy: .public)")
+            throw DomainError.network("codex remote-control start failed (exit=\(code))")
+        case .spawnFailed(let detail):
+            Logger.codex.error("remote-control start spawn failed: \(detail, privacy: .public)")
+            throw DomainError.network("codex remote-control start spawn failed: \(detail)")
         }
     }
 
@@ -472,5 +610,48 @@ extension CodexRateLimitsDTO {
         let utilization = max(0, Double(used) / 100.0)
         let date = Date(timeIntervalSince1970: TimeInterval(resets))
         return RateLimit(utilization: utilization, resetsAt: date)
+    }
+}
+
+// MARK: - Codex CLI version model
+
+/// `codex app-server` の起動方法は CLI のバージョンで分岐する。
+fileprivate enum CodexLaunchFlow: Sendable {
+    /// v0.130 まで: `codex app-server` 単体で stdio JSON-RPC サーバ。
+    case stdio
+    /// v0.133 以降: `remote-control start` で daemon を起動し、`app-server proxy` で stdio をリレー。
+    case daemonAndProxy
+}
+
+fileprivate struct CodexVersion: Comparable, Sendable, CustomStringConvertible {
+    let major: Int
+    let minor: Int
+    let patch: Int
+
+    var description: String { "\(major).\(minor).\(patch)" }
+
+    /// `codex --version` の出力 (`codex-cli 0.130.0` 等) から最初の `MAJOR.MINOR.PATCH` を抽出。
+    /// プレリリースタグ (`-rc.1` 等) は無視する。抽出失敗時は nil。
+    static func parse(_ output: String) -> CodexVersion? {
+        guard let regex = try? NSRegularExpression(pattern: #"(\d+)\.(\d+)\.(\d+)"#) else {
+            return nil
+        }
+        let range = NSRange(output.startIndex..<output.endIndex, in: output)
+        guard let match = regex.firstMatch(in: output, range: range),
+              match.numberOfRanges == 4 else {
+            return nil
+        }
+        func intAt(_ idx: Int) -> Int? {
+            guard let r = Range(match.range(at: idx), in: output) else { return nil }
+            return Int(output[r])
+        }
+        guard let major = intAt(1), let minor = intAt(2), let patch = intAt(3) else {
+            return nil
+        }
+        return CodexVersion(major: major, minor: minor, patch: patch)
+    }
+
+    static func < (lhs: Self, rhs: Self) -> Bool {
+        (lhs.major, lhs.minor, lhs.patch) < (rhs.major, rhs.minor, rhs.patch)
     }
 }
