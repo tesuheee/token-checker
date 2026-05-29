@@ -3,7 +3,10 @@ import AppKit
 
 struct UsagePopoverView: View {
     @Bindable var viewModel: UsageViewModel
+    @Bindable var languageStore: LanguageStore
     @ObservedObject var launchAtLogin: LaunchAtLoginStore
+
+    private var language: AppLanguage { languageStore.selectedLanguage }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -13,6 +16,7 @@ struct UsagePopoverView: View {
                 title: "Claude Code",
                 brand: .claude,
                 result: viewModel.snapshot.claude,
+                language: language,
                 loginAction: { viewModel.openClaudeLogin() }
             )
 
@@ -22,6 +26,7 @@ struct UsagePopoverView: View {
                 title: "Codex",
                 brand: .codex,
                 result: viewModel.snapshot.codex,
+                language: language,
                 loginAction: { viewModel.openCodexLogin() }
             )
 
@@ -45,13 +50,13 @@ struct UsagePopoverView: View {
     private var settingsBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("更新間隔")
+                Text(L10n.tr("settings.refresh_interval", language: language))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Picker("", selection: $viewModel.pollingInterval) {
                     ForEach(PollingInterval.allCases) { interval in
-                        Text(interval.label).tag(interval)
+                        Text(interval.label(language: language)).tag(interval)
                     }
                 }
                 .labelsHidden()
@@ -59,7 +64,21 @@ struct UsagePopoverView: View {
             }
 
             HStack {
-                Text("ログイン時に自動起動")
+                Text(L10n.tr("settings.language", language: language))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Picker("", selection: $languageStore.selectedLanguage) {
+                    ForEach(AppLanguage.allCases) { option in
+                        Text(L10n.tr(option.displayKey, language: option)).tag(option)
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+
+            HStack {
+                Text(L10n.tr("settings.launch_at_login", language: language))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -77,7 +96,11 @@ struct UsagePopoverView: View {
     private var footer: some View {
         HStack {
             if viewModel.snapshot.fetchedAt > .distantPast {
-                Text("更新: \(DateFormatter.localizedString(from: viewModel.snapshot.fetchedAt, dateStyle: .none, timeStyle: .short))")
+                Text(L10n.format(
+                    "footer.updated_at",
+                    language: language,
+                    formattedTime(viewModel.snapshot.fetchedAt)
+                ))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
@@ -92,13 +115,21 @@ struct UsagePopoverView: View {
                 }
             }
             .buttonStyle(.borderless)
-            .help("今すぐ更新")
+            .help(L10n.tr("footer.refresh_now", language: language))
 
-            Button("終了") {
+            Button(L10n.tr("footer.quit", language: language)) {
                 NSApplication.shared.terminate(nil)
             }
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
         }
+    }
+
+    private func formattedTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = language.locale
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }

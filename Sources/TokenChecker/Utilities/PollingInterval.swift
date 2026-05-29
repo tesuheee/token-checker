@@ -10,13 +10,13 @@ enum PollingInterval: Int, CaseIterable, Identifiable, Codable, Sendable {
     var id: Int { rawValue }
     var seconds: TimeInterval { TimeInterval(rawValue) }
 
-    var label: String {
+    func label(language: AppLanguage) -> String {
         switch self {
-        case .sec30: return "30秒"
-        case .min1:  return "1分"
-        case .min2:  return "2分"
-        case .min5:  return "5分"
-        case .min10: return "10分"
+        case .sec30: return L10n.tr("interval.sec30", language: language)
+        case .min1:  return L10n.tr("interval.min1", language: language)
+        case .min2:  return L10n.tr("interval.min2", language: language)
+        case .min5:  return L10n.tr("interval.min5", language: language)
+        case .min10: return L10n.tr("interval.min10", language: language)
         }
     }
 

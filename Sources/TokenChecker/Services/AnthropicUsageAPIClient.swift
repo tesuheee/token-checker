@@ -33,7 +33,7 @@ struct AnthropicUsageAPIClient: Sendable {
         }
 
         guard let http = response as? HTTPURLResponse else {
-            throw DomainError.network("Invalid response")
+            throw DomainError.invalidResponse
         }
 
         switch http.statusCode {

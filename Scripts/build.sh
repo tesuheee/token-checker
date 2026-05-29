@@ -79,6 +79,15 @@ rm -rf "${APP_BUNDLE}"
 mkdir -p "${MACOS}" "${RESOURCES}"
 cp "${BUILD_DIR}/${PRODUCT}" "${MACOS}/"
 cp Resources/Info.plist "${CONTENTS}/"
+
+RESOURCE_BUNDLE="${BUILD_DIR}/${PRODUCT}_${PRODUCT}.bundle"
+if [[ -d "${RESOURCE_BUNDLE}" ]]; then
+    cp -R "${RESOURCE_BUNDLE}" "${RESOURCES}/"
+else
+    error "SwiftPM resource bundle not found: ${RESOURCE_BUNDLE}"
+    exit 1
+fi
+
 # Info.plist の CFBundleIconFile=AppIcon は無条件のため、.icns 不在を静かに通さない．
 if [[ ! -f Resources/AppIcon.icns ]]; then
     error "Resources/AppIcon.icns が見つかりません。Info.plist の CFBundleIconFile=AppIcon と整合させるため必須です。"

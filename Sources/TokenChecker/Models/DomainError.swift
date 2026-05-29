@@ -11,33 +11,52 @@ enum DomainError: Error, Equatable, LocalizedError, Sendable {
     case decoding(String)
     case timeout
     case network(String)
+    case invalidResponse
+    case codexStartFailed(String)
+    case codexDaemonTimeout
+    case codexDaemonFailed(exitCode: Int32)
+    case codexDaemonSpawnFailed(String)
 
     var errorDescription: String? {
+        localizedDescription(language: .default)
+    }
+
+    func localizedDescription(language: AppLanguage) -> String {
         switch self {
         case .keychainTokenMissing:
-            return "Claude Code の OAuth トークンが Keychain に見つかりません。ターミナルで `claude login` を実行してください。"
+            return L10n.tr("error.keychain_token_missing", language: language)
         case .anthropicUnauthorized:
-            return "Anthropic からの認証エラー (401)。`claude login` で再ログインしてください。"
+            return L10n.tr("error.anthropic_unauthorized", language: language)
         case .anthropicRateLimited(let retryAfter):
             if let sec = retryAfter {
                 let mins = max(1, Int((sec / 60).rounded()))
-                return "Anthropic API のレート制限に達しました。約 \(mins) 分後に自動で再試行します。"
+                return L10n.format("error.anthropic_rate_limited_with_retry", language: language, mins)
             }
-            return "Anthropic API のレート制限 (429)。次回ポーリングまで待機します。"
+            return L10n.tr("error.anthropic_rate_limited", language: language)
         case .anthropicHTTP(let status):
-            return "Anthropic API エラー (status \(status))"
+            return L10n.format("error.anthropic_http", language: language, status)
         case .codexCLINotFound:
-            return "Codex CLI が見つかりません。`npm i -g @openai/codex` を実行してください。"
+            return L10n.tr("error.codex_cli_not_found", language: language)
         case .codexProcessExited:
-            return "codex app-server が終了しました。再起動を試みます。"
+            return L10n.tr("error.codex_process_exited", language: language)
         case .codexRPCError(let message):
-            return "Codex RPC エラー: \(message)"
+            return L10n.format("error.codex_rpc", language: language, message)
         case .decoding(let detail):
-            return "レスポンスのデコードに失敗: \(detail)"
+            return L10n.format("error.decoding", language: language, detail)
         case .timeout:
-            return "通信がタイムアウトしました。"
+            return L10n.tr("error.timeout", language: language)
         case .network(let detail):
-            return "ネットワークエラー: \(detail)"
+            return L10n.format("error.network", language: language, detail)
+        case .invalidResponse:
+            return L10n.tr("error.invalid_response", language: language)
+        case .codexStartFailed(let detail):
+            return L10n.format("error.codex_start_failed", language: language, detail)
+        case .codexDaemonTimeout:
+            return L10n.tr("error.codex_daemon_timeout", language: language)
+        case .codexDaemonFailed(let exitCode):
+            return L10n.format("error.codex_daemon_failed", language: language, exitCode)
+        case .codexDaemonSpawnFailed(let detail):
+            return L10n.format("error.codex_daemon_spawn_failed", language: language, detail)
         }
     }
 }

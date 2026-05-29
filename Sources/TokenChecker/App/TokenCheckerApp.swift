@@ -5,11 +5,16 @@ import AppKit
 struct TokenCheckerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var viewModel = UsageViewModel()
+    @State private var languageStore = LanguageStore()
     @StateObject private var launchAtLogin = LaunchAtLoginStore()
 
     var body: some Scene {
         MenuBarExtra {
-            UsagePopoverView(viewModel: viewModel, launchAtLogin: launchAtLogin)
+            UsagePopoverView(
+                viewModel: viewModel,
+                languageStore: languageStore,
+                launchAtLogin: launchAtLogin
+            )
                 .onAppear {
                     launchAtLogin.refresh()
                     // 終了時に codex 子プロセスを始末するためのフックを AppDelegate に登録する。

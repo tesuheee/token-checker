@@ -122,7 +122,7 @@ actor CodexAppServerClient {
         do {
             try proc.run()
         } catch {
-            throw DomainError.network("codex app-server failed to start: \(error.localizedDescription)")
+            throw DomainError.codexStartFailed(error.localizedDescription)
         }
 
         self.process = proc
@@ -350,14 +350,14 @@ actor CodexAppServerClient {
             return
         case .timedOut:
             Logger.codex.error("app-server daemon start timed out after 5s")
-            throw DomainError.network("codex app-server daemon start がタイムアウトしました (5s)")
+            throw DomainError.codexDaemonTimeout
         case .badExit(let code, let stderr):
             let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             Logger.codex.error("app-server daemon start failed (exit=\(code, privacy: .public)): \(detail, privacy: .public)")
-            throw DomainError.network("codex app-server daemon start failed (exit=\(code))")
+            throw DomainError.codexDaemonFailed(exitCode: code)
         case .spawnFailed(let detail):
             Logger.codex.error("app-server daemon start spawn failed: \(detail, privacy: .public)")
-            throw DomainError.network("codex app-server daemon start spawn failed: \(detail)")
+            throw DomainError.codexDaemonSpawnFailed(detail)
         }
     }
 
