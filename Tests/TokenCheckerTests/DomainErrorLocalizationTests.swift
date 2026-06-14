@@ -34,4 +34,19 @@ final class DomainErrorLocalizationTests: XCTestCase {
             "codex app-server daemon start 启动失败：missing binary"
         )
     }
+
+    func testCodexDirectApiErrorsRenderInSelectedLanguage() {
+        XCTAssertEqual(
+            DomainError.codexAuthMissing.localizedDescription(language: .english),
+            "Codex authentication was not found. Run `codex login` in Terminal."
+        )
+        XCTAssertEqual(
+            DomainError.codexRateLimited(retryAfter: 120).localizedDescription(language: .japanese),
+            "Codex API のレート制限に達しました。約 2 分後に自動で再試行します。"
+        )
+        XCTAssertEqual(
+            DomainError.codexHTTP(status: 500).localizedDescription(language: .english),
+            "Codex API error (status 500)"
+        )
+    }
 }

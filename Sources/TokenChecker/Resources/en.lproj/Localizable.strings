@@ -2,13 +2,18 @@
 "error.anthropic_rate_limited" = "Anthropic API rate limit reached (429). Waiting until the next polling interval.";
 "error.anthropic_rate_limited_with_retry" = "Anthropic API rate limit reached. Retrying automatically in about %d min.";
 "error.anthropic_unauthorized" = "Anthropic authentication error (401). Run `claude login` again.";
+"error.codex_auth_missing" = "Codex authentication was not found. Run `codex login` in Terminal.";
 "error.codex_cli_not_found" = "Codex CLI was not found. Run `npm i -g @openai/codex`.";
 "error.codex_daemon_failed" = "codex app-server daemon start failed (exit=%d)";
 "error.codex_daemon_spawn_failed" = "codex app-server daemon start failed to launch: %@";
 "error.codex_daemon_timeout" = "codex app-server daemon start timed out (5s)";
+"error.codex_http" = "Codex API error (status %d)";
 "error.codex_process_exited" = "codex app-server exited. Trying to restart.";
+"error.codex_rate_limited" = "Codex API rate limit reached (429). Waiting until the next polling interval.";
+"error.codex_rate_limited_with_retry" = "Codex API rate limit reached. Retrying automatically in about %d min.";
 "error.codex_rpc" = "Codex RPC error: %@";
 "error.codex_start_failed" = "codex app-server failed to start: %@";
+"error.codex_unauthorized" = "Codex authentication error. Run `codex login` again.";
 "error.decoding" = "Failed to decode response: %@";
 "error.fetch_failed" = "Fetch failed";
 "error.invalid_response" = "Invalid response.";
