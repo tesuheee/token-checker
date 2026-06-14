@@ -65,7 +65,7 @@ struct ServiceSectionView: View {
             limitRow(
                 label: L10n.tr("window.weekly", language: language),
                 limit: weekly,
-                barHeight: 1.5,
+                barHeight: 0.75,
                 percentWeight: .regular
             )
         }
@@ -73,7 +73,7 @@ struct ServiceSectionView: View {
             limitRow(
                 label: L10n.tr("window.weekly_sonnet", language: language),
                 limit: sonnet,
-                barHeight: 1.5,
+                barHeight: 0.75,
                 percentWeight: .regular
             )
         }
