@@ -25,8 +25,14 @@ For Windows, see [Headroom](https://github.com/tesuheee/headroom-ai-usage-monito
 - Add a display mode setting for used quota (0% to 100%) vs remaining quota (100% to 0%).
 
 <p align="center">
+  <strong>Menu bar view</strong><br/>
+  Shows Claude Code and Codex remaining quota at a glance.
+  <br/><br/>
   <img src=".github/assets/fork-menubar-remaining.png" alt="Menu bar showing remaining quota" width="116"/>
-  <br/>
+  <br/><br/>
+  <strong>Popover details</strong><br/>
+  Shows 5-hour and weekly windows, reset times, refresh interval, display mode, and launch-at-login setting.
+  <br/><br/>
   <img src=".github/assets/fork-popover-remaining.png" alt="Popover showing remaining quota" width="327"/>
 </p>
 

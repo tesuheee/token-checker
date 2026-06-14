@@ -25,8 +25,14 @@ Windows 向けには [Headroom](https://github.com/tesuheee/headroom-ai-usage-mo
 - 使用量 (0% → 100%) と残量 (100% → 0%) の表示を切り替える設定を追加。
 
 <p align="center">
+  <strong>メニューバー表示</strong><br/>
+  Claude Code と Codex の残量を常時確認できます。
+  <br/><br/>
   <img src=".github/assets/fork-menubar-remaining.png" alt="残量表示のメニューバー" width="116"/>
-  <br/>
+  <br/><br/>
+  <strong>ポップオーバー詳細</strong><br/>
+  5時間・週次ウィンドウ、リセット時刻、更新間隔、表示内容、ログイン時の自動起動設定を確認できます。
+  <br/><br/>
   <img src=".github/assets/fork-popover-remaining.png" alt="残量表示のポップオーバー" width="327"/>
 </p>
 
