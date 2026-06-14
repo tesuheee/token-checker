@@ -49,7 +49,7 @@ struct ServiceSectionView: View {
     @ViewBuilder
     private func usageBlock(_ usage: ServiceUsage) -> some View {
         if let five = usage.fiveHour {
-            limitRow(label: L10n.tr("window.five_hour", language: language), limit: five)
+            limitRow(label: L10n.tr("window.five_hour", language: language), limit: five, barHeight: 6)
         } else {
             Text(L10n.tr("window.five_hour.no_data", language: language))
                 .font(.system(size: 11))
@@ -57,14 +57,14 @@ struct ServiceSectionView: View {
         }
 
         if let weekly = usage.weekly {
-            limitRow(label: L10n.tr("window.weekly", language: language), limit: weekly)
+            limitRow(label: L10n.tr("window.weekly", language: language), limit: weekly, barHeight: 3)
         }
         if let sonnet = usage.weeklySonnet {
-            limitRow(label: L10n.tr("window.weekly_sonnet", language: language), limit: sonnet)
+            limitRow(label: L10n.tr("window.weekly_sonnet", language: language), limit: sonnet, barHeight: 3)
         }
     }
 
-    private func limitRow(label: String, limit: RateLimit) -> some View {
+    private func limitRow(label: String, limit: RateLimit, barHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label)
@@ -77,6 +77,7 @@ struct ServiceSectionView: View {
             }
             ProgressBarView(
                 value: displayMode.clampedValue(for: limit),
+                height: barHeight,
                 tint: displayMode.color(for: limit)
             )
             Text(resetLabel(limit.resetsAt))
