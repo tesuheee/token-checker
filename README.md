@@ -6,6 +6,16 @@ A macOS menu bar app that displays Claude Code and Codex usage in real time.
 
 This repository is a personal fork of [otoha1119/token-checker](https://github.com/otoha1119/token-checker). It keeps the original design and implementation as the base, with additional fixes for npm/nvm Codex CLI installs, menu bar readability, and weekly-window display.
 
+## Companion Windows App
+
+For Windows, see [Headroom](https://github.com/tesuheee/headroom-ai-usage-monitor), a desktop AI usage monitor for Claude Code and Codex quotas, reset times, OAuth login status, and rate limits.
+
+<p align="center">
+  <a href="https://github.com/tesuheee/headroom-ai-usage-monitor">
+    <img src=".github/assets/headroom-overview.png" alt="Headroom Windows AI usage monitor" width="760"/>
+  </a>
+</p>
+
 ## Changes in This Fork
 
 - Prefer the stdio `codex app-server` flow and prepend the resolved Codex executable directory to the child process `PATH`, which helps npm/nvm installs whose `codex` command runs through `env node`.
@@ -81,10 +91,6 @@ git pull
 ```
 
 The existing app is overwritten in place. Settings such as polling interval, display mode, and launch-at-login persist via UserDefaults. If the app is already running, quit it from the menu bar item first, then relaunch.
-
-## Related Project
-
-For Windows, see [Headroom](https://github.com/tesuheee/headroom-ai-usage-monitor), a desktop AI usage monitor for Claude Code and Codex quotas, reset times, OAuth login status, and rate limits.
 
 ## Uninstall
 

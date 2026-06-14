@@ -6,6 +6,16 @@ macOS のメニューバーに Claude Code と Codex の使用率を常時表示
 
 このリポジトリは [otoha1119/token-checker](https://github.com/otoha1119/token-checker) を元にした個人用フォークです。オリジナル版の設計と実装をベースに、npm/nvm 版 Codex CLI での起動安定化、メニューバー表示の視認性改善、週次ウィンドウ表示の強化を加えています。
 
+## Windows向けアプリ
+
+Windows 向けには [Headroom](https://github.com/tesuheee/headroom-ai-usage-monitor) も公開しています。Claude Code と Codex のクォータ、リセット時刻、OAuth ログイン状態、レート制限を確認するためのデスクトップAI使用量モニターです。
+
+<p align="center">
+  <a href="https://github.com/tesuheee/headroom-ai-usage-monitor">
+    <img src=".github/assets/headroom-overview.png" alt="Headroom Windows AI使用量モニター" width="760"/>
+  </a>
+</p>
+
 ## このフォークで追加した変更
 
 - npm/nvm 経由でインストールした Codex CLI でも `codex app-server` を起動しやすいよう、stdio 起動を優先し、`codex` と同じディレクトリを子プロセスの `PATH` に追加。
@@ -81,10 +91,6 @@ git pull
 ```
 
 既存のアプリは自動的に上書きされます。ポーリング間隔、表示内容、ログイン時の自動起動などの設定は UserDefaults に保存されているため引き継がれます。アプリが既に起動中の場合はメニューバーの「終了」で一度落としてから再度開いてください。
-
-## 関連プロジェクト
-
-Windows 向けには [Headroom](https://github.com/tesuheee/headroom-ai-usage-monitor) も公開しています。Claude Code と Codex のクォータ、リセット時刻、OAuth ログイン状態、レート制限を確認するためのデスクトップAI使用量モニターです。
 
 ## アンインストール
 
