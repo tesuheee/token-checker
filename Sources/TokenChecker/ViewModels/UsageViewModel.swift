@@ -67,7 +67,7 @@ final class UsageViewModel {
         do {
             return .success(try await claudeProvider.fetch())
         } catch let err as DomainError {
-            Logger.claude.error("fetch failed: \(err.localizedDescription)")
+            Logger.claude.error("fetch failed: \(err.localizedDescription, privacy: .public)")
             return .failure(err)
         } catch {
             return .failure(.network(error.localizedDescription))
@@ -78,7 +78,7 @@ final class UsageViewModel {
         do {
             return .success(try await codexProvider.fetch())
         } catch let err as DomainError {
-            Logger.codex.error("fetch failed: \(err.localizedDescription)")
+            Logger.codex.error("fetch failed: \(err.localizedDescription, privacy: .public)")
             return .failure(err)
         } catch {
             return .failure(.network(error.localizedDescription))
