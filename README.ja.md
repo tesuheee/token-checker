@@ -2,19 +2,9 @@
 
 # Token Checker 修正版 (fork)
 
-macOS のメニューバーに Claude Code と Codex の使用率を常時表示する macOS アプリケーションです。
+macOS のメニューバーに Claude Code と Codex の使用率を常時表示する macOS アプリケーションです。元の Token Checker のコンセプトを保ちつつ、自分の Codex CLI 環境で必要だった修正と、視認性・クォータ表示まわりの改善を加えたフォークです。
 
 このリポジトリは [otoha1119/token-checker](https://github.com/otoha1119/token-checker) を元にした個人用フォークです。オリジナル版の設計と実装をベースに、npm/nvm 版 Codex CLI での起動安定化、メニューバー表示の視認性改善、週次ウィンドウ表示の強化を加えています。
-
-## Windows向けアプリ
-
-Windows 向けには [Headroom](https://github.com/tesuheee/headroom-ai-usage-monitor) も公開しています。Claude Code と Codex のクォータ、リセット時刻、OAuth ログイン状態、レート制限を確認するためのデスクトップAI使用量モニターです。
-
-<p align="center">
-  <a href="https://github.com/tesuheee/headroom-ai-usage-monitor">
-    <img src=".github/assets/headroom-overview.png" alt="Headroom Windows AI使用量モニター" width="760"/>
-  </a>
-</p>
 
 ## このフォークで追加した変更
 
@@ -23,6 +13,16 @@ Windows 向けには [Headroom](https://github.com/tesuheee/headroom-ai-usage-mo
 - macOS のダークなメニューバー上でパーセンテージ文字が黒く潰れないよう、メニューバー画像生成時の color scheme を明示。
 - 週次ウィンドウにもバーを表示。5 時間ウィンドウを主指標として太く、週次ウィンドウを補助指標として細く表示。
 - 使用量 (0% → 100%) と残量 (100% → 0%) の表示を切り替える設定を追加。
+
+## 関連プロジェクト
+
+Windows 向けには [Headroom](https://github.com/tesuheee/headroom-ai-usage-monitor) も公開しています。Claude Code と Codex のクォータ、リセット時刻、OAuth ログイン状態、レート制限を確認するためのデスクトップAI使用量モニターです。
+
+<p align="center">
+  <a href="https://github.com/tesuheee/headroom-ai-usage-monitor">
+    <img src=".github/assets/headroom-overview.png" alt="Headroom Windows AI使用量モニター" width="760"/>
+  </a>
+</p>
 
 <p align="center">
   <strong>メニューバー表示</strong><br/>
@@ -38,7 +38,7 @@ Windows 向けには [Headroom](https://github.com/tesuheee/headroom-ai-usage-mo
 
 ## 概要
 
-ターミナルで `claude login` / `codex login` を完了済みのアカウントに対し、Anthropic の OAuth エンドポイントおよび `codex app-server` の JSON-RPC を経由してレート制限情報を取得します。取得結果はメニューバーに 2 個のドーナツチャートと数値で表示され、クリックでポップオーバーに 5 時間ウィンドウと週次ウィンドウの詳細を展開します。
+元の Token Checker と同様に、`claude login` / `codex login` で保存された認証情報を使い、Anthropic の OAuth エンドポイントおよび `codex app-server` の JSON-RPC を経由してレート制限情報を取得します。取得結果はメニューバーに 2 個のドーナツチャートと数値で表示され、クリックでポップオーバーに 5 時間ウィンドウと週次ウィンドウの詳細を展開します。
 
 ## 動作要件
 

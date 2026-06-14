@@ -2,19 +2,9 @@
 
 # Token Checker Fixed Fork
 
-A macOS menu bar app that displays Claude Code and Codex usage in real time.
+A macOS menu bar app that displays Claude Code and Codex usage in real time. This fork keeps the original Token Checker concept and adds fixes for my Codex CLI environment plus a few visibility and quota-display improvements.
 
 This repository is a personal fork of [otoha1119/token-checker](https://github.com/otoha1119/token-checker). It keeps the original design and implementation as the base, with additional fixes for npm/nvm Codex CLI installs, menu bar readability, and weekly-window display.
-
-## Companion Windows App
-
-For Windows, see [Headroom](https://github.com/tesuheee/headroom-ai-usage-monitor), a desktop AI usage monitor for Claude Code and Codex quotas, reset times, OAuth login status, and rate limits.
-
-<p align="center">
-  <a href="https://github.com/tesuheee/headroom-ai-usage-monitor">
-    <img src=".github/assets/headroom-overview.png" alt="Headroom Windows AI usage monitor" width="760"/>
-  </a>
-</p>
 
 ## Changes in This Fork
 
@@ -23,6 +13,16 @@ For Windows, see [Headroom](https://github.com/tesuheee/headroom-ai-usage-monito
 - Match the rendered menu bar label to the active macOS appearance so percentage text remains readable in dark menu bars.
 - Show bars for weekly windows. The 5-hour window remains visually primary, while weekly windows use thinner bars.
 - Add a display mode setting for used quota (0% to 100%) vs remaining quota (100% to 0%).
+
+## Related Project
+
+For Windows, see [Headroom](https://github.com/tesuheee/headroom-ai-usage-monitor), a desktop AI usage monitor for Claude Code and Codex quotas, reset times, OAuth login status, and rate limits.
+
+<p align="center">
+  <a href="https://github.com/tesuheee/headroom-ai-usage-monitor">
+    <img src=".github/assets/headroom-overview.png" alt="Headroom Windows AI usage monitor" width="760"/>
+  </a>
+</p>
 
 <p align="center">
   <strong>Menu bar view</strong><br/>
@@ -38,7 +38,7 @@ For Windows, see [Headroom](https://github.com/tesuheee/headroom-ai-usage-monito
 
 ## Overview
 
-For accounts already authenticated via `claude login` / `codex login`, this app retrieves rate-limit information through the Anthropic OAuth endpoint and the `codex app-server` JSON-RPC. Results are shown as two donut charts with numeric values in the menu bar; clicking opens a popover with detailed 5-hour and weekly window data.
+Like the original Token Checker, this app reads the credentials created by `claude login` / `codex login` and retrieves rate-limit information through the Anthropic OAuth endpoint and the `codex app-server` JSON-RPC. Results are shown as two donut charts with numeric values in the menu bar; clicking opens a popover with detailed 5-hour and weekly window data.
 
 ## Requirements
 
