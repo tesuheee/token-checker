@@ -15,6 +15,7 @@ struct DonutChartView: View {
     var size: CGFloat = 18
     var lineWidth: CGFloat = 4
     var center: DonutCenter = .none
+    var tint: Color? = nil
 
     var body: some View {
         ZStack {
@@ -55,6 +56,7 @@ struct DonutChartView: View {
 
     private var clamped: Double { min(max(value, 0), 1) }
     private var color: Color {
+        if let tint { return tint }
         if value < 0.7 { return .green }
         if value < 0.85 { return .orange }
         return .red

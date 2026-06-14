@@ -10,6 +10,8 @@
 "error.codex_rpc" = "Codex RPC 错误：%@";
 "error.codex_start_failed" = "codex app-server 启动失败：%@";
 "error.decoding" = "响应解码失败：%@";
+"display_mode.remaining" = "剩余";
+"display_mode.used" = "用量";
 "error.fetch_failed" = "获取失败";
 "error.invalid_response" = "无效响应。";
 "error.keychain_token_missing" = "Keychain 中未找到 Claude Code OAuth token。请在终端运行 `claude login`。";
@@ -31,6 +33,7 @@
 "reset.soon" = "即将重置";
 "service.login.help" = "登录 %@";
 "settings.language" = "显示语言";
+"settings.display_mode" = "显示内容";
 "settings.launch_at_login" = "登录时自动启动";
 "settings.refresh_interval" = "刷新间隔";
 "status.loading" = "获取中...";

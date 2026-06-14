@@ -17,6 +17,7 @@ struct UsagePopoverView: View {
                 brand: .claude,
                 result: viewModel.snapshot.claude,
                 language: language,
+                displayMode: viewModel.displayMode,
                 loginAction: { viewModel.openClaudeLogin() }
             )
 
@@ -27,6 +28,7 @@ struct UsagePopoverView: View {
                 brand: .codex,
                 result: viewModel.snapshot.codex,
                 language: language,
+                displayMode: viewModel.displayMode,
                 loginAction: { viewModel.openCodexLogin() }
             )
 
@@ -57,6 +59,20 @@ struct UsagePopoverView: View {
                 Picker("", selection: $viewModel.pollingInterval) {
                     ForEach(PollingInterval.allCases) { interval in
                         Text(interval.label(language: language)).tag(interval)
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+
+            HStack {
+                Text(L10n.tr("settings.display_mode", language: language))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Picker("", selection: $viewModel.displayMode) {
+                    ForEach(UsageDisplayMode.allCases) { mode in
+                        Text(mode.label(language: language)).tag(mode)
                     }
                 }
                 .labelsHidden()

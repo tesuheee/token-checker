@@ -12,6 +12,7 @@ struct ServiceSectionView: View {
     let brand: ServiceBrand
     let result: Result<ServiceUsage, DomainError>?
     let language: AppLanguage
+    let displayMode: UsageDisplayMode
     let loginAction: () -> Void
 
     var body: some View {
@@ -56,10 +57,10 @@ struct ServiceSectionView: View {
         }
 
         if let weekly = usage.weekly {
-            secondaryRow(label: L10n.tr("window.weekly", language: language), limit: weekly)
+            limitRow(label: L10n.tr("window.weekly", language: language), limit: weekly)
         }
         if let sonnet = usage.weeklySonnet {
-            secondaryRow(label: L10n.tr("window.weekly_sonnet", language: language), limit: sonnet)
+            limitRow(label: L10n.tr("window.weekly_sonnet", language: language), limit: sonnet)
         }
     }
 
@@ -70,26 +71,17 @@ struct ServiceSectionView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("\(limit.percent)%")
+                Text("\(displayMode.percent(for: limit))%")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(color(for: limit.utilization))
+                    .foregroundStyle(displayMode.color(for: limit))
             }
-            ProgressBarView(value: limit.utilization)
+            ProgressBarView(
+                value: displayMode.clampedValue(for: limit),
+                tint: displayMode.color(for: limit)
+            )
             Text(resetLabel(limit.resetsAt))
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
-        }
-    }
-
-    private func secondaryRow(label: String, limit: RateLimit) -> some View {
-        HStack {
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text("\(limit.percent)%")
-                .font(.system(size: 11))
-                .foregroundStyle(color(for: limit.utilization))
         }
     }
 
@@ -119,12 +111,6 @@ struct ServiceSectionView: View {
         case .codex:
             Image(systemName: "terminal.fill")
         }
-    }
-
-    private func color(for value: Double) -> Color {
-        if value < 0.7 { return .green }
-        if value < 0.85 { return .orange }
-        return .red
     }
 
     private func resetLabel(_ date: Date) -> String {
