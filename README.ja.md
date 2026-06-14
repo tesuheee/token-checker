@@ -82,6 +82,10 @@ git pull
 
 既存のアプリは自動的に上書きされます。ポーリング間隔、表示内容、ログイン時の自動起動などの設定は UserDefaults に保存されているため引き継がれます。アプリが既に起動中の場合はメニューバーの「終了」で一度落としてから再度開いてください。
 
+## 関連プロジェクト
+
+Windows 向けには [Headroom](https://github.com/tesuheee/headroom-ai-usage-monitor) も公開しています。Claude Code と Codex のクォータ、リセット時刻、OAuth ログイン状態、レート制限を確認するためのデスクトップAI使用量モニターです。
+
 ## アンインストール
 
 ```bash

@@ -82,6 +82,10 @@ git pull
 
 The existing app is overwritten in place. Settings such as polling interval, display mode, and launch-at-login persist via UserDefaults. If the app is already running, quit it from the menu bar item first, then relaunch.
 
+## Related Project
+
+For Windows, see [Headroom](https://github.com/tesuheee/headroom-ai-usage-monitor), a desktop AI usage monitor for Claude Code and Codex quotas, reset times, OAuth login status, and rate limits.
+
 ## Uninstall
 
 ```bash
