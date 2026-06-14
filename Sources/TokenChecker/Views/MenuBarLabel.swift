@@ -18,25 +18,27 @@ struct MenuBarLabel: View {
     }
 
     private var renderedImage: NSImage? {
-        let claude = utilization(from: viewModel.snapshot.claude)
-        let codex = utilization(from: viewModel.snapshot.codex)
+        let claude = rateLimit(from: viewModel.snapshot.claude)
+        let codex = rateLimit(from: viewModel.snapshot.codex)
         let content = HStack(spacing: 6) {
             HStack(spacing: 3) {
                 DonutChartView(
-                    value: claude ?? 0,
+                    value: chartValue(claude),
                     size: 20,
                     lineWidth: 3,
-                    center: .sfSymbol("sparkles", scale: 0.48)
+                    center: .sfSymbol("sparkles", scale: 0.48),
+                    tint: chartColor(claude)
                 )
                 Text(percentLabel(claude))
                     .font(.system(size: 11, weight: .semibold))
             }
             HStack(spacing: 3) {
                 DonutChartView(
-                    value: codex ?? 0,
+                    value: chartValue(codex),
                     size: 20,
                     lineWidth: 3,
-                    center: .sfSymbol("terminal.fill", scale: 0.48)
+                    center: .sfSymbol("terminal.fill", scale: 0.48),
+                    tint: chartColor(codex)
                 )
                 Text(percentLabel(codex))
                     .font(.system(size: 11, weight: .semibold))
@@ -44,6 +46,7 @@ struct MenuBarLabel: View {
         }
         .padding(.horizontal, 2)
         .foregroundStyle(Color.primary)
+        .environment(\.colorScheme, effectiveColorScheme)
 
         let renderer = ImageRenderer(content: content)
         // ビットマップは高 DPI で焼いておく．image.size には触らない
@@ -55,17 +58,37 @@ struct MenuBarLabel: View {
         return image
     }
 
-    private func utilization(from result: Result<ServiceUsage, DomainError>?) -> Double? {
+    private func rateLimit(from result: Result<ServiceUsage, DomainError>?) -> RateLimit? {
         guard case .success(let usage) = result else { return nil }
-        return usage.fiveHour?.utilization
+        return usage.fiveHour
     }
 
-    private func percentLabel(_ value: Double?) -> String {
-        guard let v = value else { return "--%" }
-        // メニューバーは横幅が限られるため 100% で頭打ちにし、超過は "+" で示す。
-        // RateLimit.utilization は仕様上 1.0 を超えうる（Anthropic API 既知挙動）。
-        if v > 1.0 { return "100%+" }
-        let clamped = max(0, v)
-        return "\(Int((clamped * 100).rounded()))%"
+    private func chartValue(_ limit: RateLimit?) -> Double {
+        guard let limit else { return 0 }
+        return viewModel.displayMode.clampedValue(for: limit)
+    }
+
+    private func chartColor(_ limit: RateLimit?) -> Color? {
+        guard let limit else { return nil }
+        return viewModel.displayMode.color(for: limit)
+    }
+
+    private func percentLabel(_ limit: RateLimit?) -> String {
+        guard let limit else { return "--%" }
+        if viewModel.displayMode == .used, limit.utilization > 1.0 {
+            return "100%+"
+        }
+        return "\(viewModel.displayMode.percent(for: limit))%"
+    }
+
+    private var effectiveColorScheme: ColorScheme {
+        let appearance = NSApp.effectiveAppearance
+        let match = appearance.bestMatch(from: [.darkAqua, .aqua, .vibrantDark, .vibrantLight])
+        switch match {
+        case .darkAqua, .vibrantDark:
+            return .dark
+        default:
+            return .light
+        }
     }
 }

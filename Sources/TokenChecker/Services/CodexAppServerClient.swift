@@ -100,7 +100,10 @@ actor CodexAppServerClient {
         // v0.133 以降: app-server は引数なし起動が廃止され、`app-server daemon start` で
         //              daemon を立て、`app-server proxy` が stdio bytes をリレーする
         proc.arguments = (attempt == .daemonAndProxy) ? ["app-server", "proxy"] : ["app-server"]
-        proc.environment = Self.childEnvironment(from: ProcessInfo.processInfo.environment)
+        proc.environment = Self.childEnvironment(
+            from: ProcessInfo.processInfo.environment,
+            prependPathDirs: [executable.deletingLastPathComponent().path]
+        )
         proc.standardInput = inP
         proc.standardOutput = outP
         proc.standardError = errP
@@ -159,6 +162,9 @@ actor CodexAppServerClient {
 
     func readRateLimits() async throws -> CodexRateLimitsDTO {
         let envelope = try await request(method: "account/rateLimits/read", params: EmptyParams())
+        if let error = envelope.error {
+            throw DomainError.codexRPCError(message: error.message)
+        }
         guard let result = envelope.result else {
             throw DomainError.codexRPCError(message: "missing result for account/rateLimits/read")
         }
@@ -303,7 +309,10 @@ actor CodexAppServerClient {
         let proc = Process()
         proc.executableURL = executable
         proc.arguments = ["app-server", "daemon", "start"]
-        proc.environment = childEnvironment(from: ProcessInfo.processInfo.environment)
+        proc.environment = childEnvironment(
+            from: ProcessInfo.processInfo.environment,
+            prependPathDirs: [executable.deletingLastPathComponent().path]
+        )
 
         let outPipe = Pipe()
         let errPipe = Pipe()
@@ -367,7 +376,10 @@ actor CodexAppServerClient {
     /// 起動した場合に `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `AWS_*` 等の秘密が
     /// 子に渡ってしまう。codex 自身が必要とするのは PATH と HOME 程度なので、
     /// それ以外は意図的に渡さない。
-    private static func childEnvironment(from base: [String: String]) -> [String: String] {
+    private static func childEnvironment(
+        from base: [String: String],
+        prependPathDirs: [String] = []
+    ) -> [String: String] {
         // codex が動くのに必要な最小キーだけ通す
         let allowedKeys: Set<String> = [
             "HOME", "USER", "LOGNAME", "SHELL",
@@ -382,11 +394,15 @@ actor CodexAppServerClient {
             if let value = base[key] { env[key] = value }
         }
 
-        // PATH は固定セット + 親の PATH の安全な部分をマージ
+        // PATH は codex 自身のディレクトリ + 固定セット + 親の PATH の安全な部分をマージ。
+        // nvm/npm の `codex` は `env node` 経由の shim なので、codex と同じ bin
+        // ディレクトリにある node を PATH から解決できる必要がある。
         let basePathDirs = (base["PATH"] ?? "").split(separator: ":").map(String.init)
         let extras = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
         var seen = Set<String>()
-        let merged = (extras + basePathDirs).filter { seen.insert($0).inserted }.joined(separator: ":")
+        let merged = (prependPathDirs + extras + basePathDirs)
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+            .joined(separator: ":")
         env["PATH"] = merged
         return env
     }
@@ -416,11 +432,9 @@ actor CodexAppServerClient {
         nextId += 1
         let timeout = requestTimeout
 
-        // 同期的にエンコードして書き込み（actor 内、hop なし）
         let envelope = RPCOutbound(method: method, id: id, params: params)
         var data = try JSONEncoder().encode(envelope)
         data.append(0x0A)
-        stdin.fileHandleForWriting.write(data)
 
         // タイムアウト監視タスクを別途起動
         let timeoutTask = Task { [weak self] in
@@ -432,8 +446,10 @@ actor CodexAppServerClient {
         defer { timeoutTask.cancel() }
 
         return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<RPCInbound, Error>) in
-            // クロージャは actor isolated な同期コンテキストで実行される
+            // レスポンスが非常に速い場合に取りこぼさないよう、
+            // pending 登録を済ませてから stdin へ書き込む。
             pending[id] = cont
+            stdin.fileHandleForWriting.write(data)
         }
     }
 
@@ -617,8 +633,8 @@ fileprivate enum CodexLaunchFlow: Sendable {
     /// `codex app-server proxy` で stdio をリレー。
     case daemonAndProxy
 
-    /// 試行順序。新しい方を先頭に置く (将来 v0.150 等で別の方式が来たらここに追加)。
-    /// v0.130 ユーザーの初回起動は先頭の失敗で 1〜2 秒遅れるが、actor 内キャッシュで
-    /// 2 回目以降は即座に成功パターンが選ばれる。
-    static let defaultProbeOrder: [CodexLaunchFlow] = [.daemonAndProxy, .stdio]
+    /// 試行順序。現行 CLI でも `codex app-server` の stdio モードは動作し、
+    /// npm / nvm 経由の Codex では daemon が要求する managed standalone が存在しない。
+    /// そのため副作用の少ない stdio を先に試し、必要な場合だけ daemon/proxy へ進む。
+    static let defaultProbeOrder: [CodexLaunchFlow] = [.stdio, .daemonAndProxy]
 }

@@ -15,6 +15,9 @@ final class UsageViewModel {
     var pollingInterval: PollingInterval {
         didSet { persistInterval() }
     }
+    var displayMode: UsageDisplayMode {
+        didSet { persistDisplayMode() }
+    }
 
     init(
         claudeProvider: UsageProvider = ClaudeUsageProvider(),
@@ -23,6 +26,7 @@ final class UsageViewModel {
         self.claudeProvider = claudeProvider
         self.codexProvider = codexProvider
         self.pollingInterval = Self.loadPersistedInterval()
+        self.displayMode = Self.loadPersistedDisplayMode()
     }
 
     /// `task(id: pollingInterval)` から駆動するメインループ。
@@ -67,7 +71,7 @@ final class UsageViewModel {
         do {
             return .success(try await claudeProvider.fetch())
         } catch let err as DomainError {
-            Logger.claude.error("fetch failed: \(err.localizedDescription)")
+            Logger.claude.error("fetch failed: \(err.localizedDescription, privacy: .public)")
             return .failure(err)
         } catch {
             return .failure(.network(error.localizedDescription))
@@ -78,7 +82,7 @@ final class UsageViewModel {
         do {
             return .success(try await codexProvider.fetch())
         } catch let err as DomainError {
-            Logger.codex.error("fetch failed: \(err.localizedDescription)")
+            Logger.codex.error("fetch failed: \(err.localizedDescription, privacy: .public)")
             return .failure(err)
         } catch {
             return .failure(.network(error.localizedDescription))
@@ -122,13 +126,25 @@ final class UsageViewModel {
     // MARK: - 永続化
 
     private static let intervalKey = "pollingInterval"
+    private static let displayModeKey = "usageDisplayMode"
 
     private static func loadPersistedInterval() -> PollingInterval {
         let raw = UserDefaults.standard.integer(forKey: intervalKey)
         return PollingInterval(rawValue: raw) ?? .default
     }
 
+    private static func loadPersistedDisplayMode() -> UsageDisplayMode {
+        guard let raw = UserDefaults.standard.string(forKey: displayModeKey) else {
+            return .default
+        }
+        return UsageDisplayMode(rawValue: raw) ?? .default
+    }
+
     private func persistInterval() {
         UserDefaults.standard.set(pollingInterval.rawValue, forKey: Self.intervalKey)
+    }
+
+    private func persistDisplayMode() {
+        UserDefaults.standard.set(displayMode.rawValue, forKey: Self.displayModeKey)
     }
 }

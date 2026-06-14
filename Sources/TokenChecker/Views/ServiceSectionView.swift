@@ -12,6 +12,7 @@ struct ServiceSectionView: View {
     let brand: ServiceBrand
     let result: Result<ServiceUsage, DomainError>?
     let language: AppLanguage
+    let displayMode: UsageDisplayMode
     let loginAction: () -> Void
 
     var body: some View {
@@ -48,7 +49,12 @@ struct ServiceSectionView: View {
     @ViewBuilder
     private func usageBlock(_ usage: ServiceUsage) -> some View {
         if let five = usage.fiveHour {
-            limitRow(label: L10n.tr("window.five_hour", language: language), limit: five)
+            limitRow(
+                label: L10n.tr("window.five_hour", language: language),
+                limit: five,
+                barHeight: 6,
+                percentWeight: .bold
+            )
         } else {
             Text(L10n.tr("window.five_hour.no_data", language: language))
                 .font(.system(size: 11))
@@ -56,40 +62,47 @@ struct ServiceSectionView: View {
         }
 
         if let weekly = usage.weekly {
-            secondaryRow(label: L10n.tr("window.weekly", language: language), limit: weekly)
+            limitRow(
+                label: L10n.tr("window.weekly", language: language),
+                limit: weekly,
+                barHeight: 0.75,
+                percentWeight: .regular
+            )
         }
         if let sonnet = usage.weeklySonnet {
-            secondaryRow(label: L10n.tr("window.weekly_sonnet", language: language), limit: sonnet)
+            limitRow(
+                label: L10n.tr("window.weekly_sonnet", language: language),
+                limit: sonnet,
+                barHeight: 0.75,
+                percentWeight: .regular
+            )
         }
     }
 
-    private func limitRow(label: String, limit: RateLimit) -> some View {
+    private func limitRow(
+        label: String,
+        limit: RateLimit,
+        barHeight: CGFloat,
+        percentWeight: Font.Weight
+    ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("\(limit.percent)%")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(color(for: limit.utilization))
+                Text("\(displayMode.percent(for: limit))%")
+                    .font(.system(size: 12, weight: percentWeight))
+                    .foregroundStyle(displayMode.color(for: limit))
             }
-            ProgressBarView(value: limit.utilization)
+            ProgressBarView(
+                value: displayMode.clampedValue(for: limit),
+                height: barHeight,
+                tint: displayMode.color(for: limit)
+            )
             Text(resetLabel(limit.resetsAt))
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
-        }
-    }
-
-    private func secondaryRow(label: String, limit: RateLimit) -> some View {
-        HStack {
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text("\(limit.percent)%")
-                .font(.system(size: 11))
-                .foregroundStyle(color(for: limit.utilization))
         }
     }
 
@@ -119,12 +132,6 @@ struct ServiceSectionView: View {
         case .codex:
             Image(systemName: "terminal.fill")
         }
-    }
-
-    private func color(for value: Double) -> Color {
-        if value < 0.7 { return .green }
-        if value < 0.85 { return .orange }
-        return .red
     }
 
     private func resetLabel(_ date: Date) -> String {

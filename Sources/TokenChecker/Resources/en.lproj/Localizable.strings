@@ -10,6 +10,8 @@
 "error.codex_rpc" = "Codex RPC error: %@";
 "error.codex_start_failed" = "codex app-server failed to start: %@";
 "error.decoding" = "Failed to decode response: %@";
+"display_mode.remaining" = "Remaining";
+"display_mode.used" = "Used";
 "error.fetch_failed" = "Fetch failed";
 "error.invalid_response" = "Invalid response.";
 "error.keychain_token_missing" = "Claude Code OAuth token was not found in Keychain. Run `claude login` in Terminal.";
@@ -31,6 +33,7 @@
 "reset.soon" = "Reset soon";
 "service.login.help" = "Log in to %@";
 "settings.language" = "Display language";
+"settings.display_mode" = "Display mode";
 "settings.launch_at_login" = "Launch at login";
 "settings.refresh_interval" = "Refresh interval";
 "status.loading" = "Fetching...";

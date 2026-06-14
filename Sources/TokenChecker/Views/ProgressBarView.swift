@@ -3,6 +3,7 @@ import SwiftUI
 struct ProgressBarView: View {
     let value: Double   // 0.0〜1.0
     var height: CGFloat = 6
+    var tint: Color? = nil
 
     var body: some View {
         GeometryReader { geo in
@@ -19,6 +20,7 @@ struct ProgressBarView: View {
 
     private var clamped: Double { min(max(value, 0), 1) }
     private var color: Color {
+        if let tint { return tint }
         if value < 0.7 { return .green }
         if value < 0.85 { return .orange }
         return .red
