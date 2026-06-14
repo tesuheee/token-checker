@@ -6,6 +6,18 @@ macOS のメニューバーに Claude Code と Codex の使用率を常時表示
 
 このリポジトリは [otoha1119/token-checker](https://github.com/otoha1119/token-checker) を元にした個人用フォークです。オリジナル版の設計と実装をベースに、npm/nvm 版 Codex CLI での起動安定化、メニューバー表示の視認性改善、週次ウィンドウ表示の強化を加えています。
 
+<p align="center">
+  <strong>メニューバー表示</strong><br/>
+  Claude Code と Codex の残量を常時確認できます。
+  <br/><br/>
+  <img src=".github/assets/fork-menubar-remaining.png" alt="残量表示のメニューバー" width="116"/>
+  <br/><br/>
+  <strong>ポップオーバー詳細</strong><br/>
+  5時間・週次ウィンドウ、リセット時刻、更新間隔、表示内容、ログイン時の自動起動設定を確認できます。
+  <br/><br/>
+  <img src=".github/assets/fork-popover-remaining.png" alt="残量表示のポップオーバー" width="327"/>
+</p>
+
 ## このフォークで追加した変更
 
 - npm/nvm 経由でインストールした Codex CLI でも `codex app-server` を起動しやすいよう、stdio 起動を優先し、`codex` と同じディレクトリを子プロセスの `PATH` に追加。
@@ -22,18 +34,6 @@ Windows 向けには [Headroom](https://github.com/tesuheee/headroom-ai-usage-mo
   <a href="https://github.com/tesuheee/headroom-ai-usage-monitor">
     <img src=".github/assets/headroom-overview.png" alt="Headroom Windows AI使用量モニター" width="760"/>
   </a>
-</p>
-
-<p align="center">
-  <strong>メニューバー表示</strong><br/>
-  Claude Code と Codex の残量を常時確認できます。
-  <br/><br/>
-  <img src=".github/assets/fork-menubar-remaining.png" alt="残量表示のメニューバー" width="116"/>
-  <br/><br/>
-  <strong>ポップオーバー詳細</strong><br/>
-  5時間・週次ウィンドウ、リセット時刻、更新間隔、表示内容、ログイン時の自動起動設定を確認できます。
-  <br/><br/>
-  <img src=".github/assets/fork-popover-remaining.png" alt="残量表示のポップオーバー" width="327"/>
 </p>
 
 ## 概要

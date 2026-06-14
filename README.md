@@ -6,6 +6,18 @@ A macOS menu bar app that displays Claude Code and Codex usage in real time. Thi
 
 This repository is a personal fork of [otoha1119/token-checker](https://github.com/otoha1119/token-checker). It keeps the original design and implementation as the base, with additional fixes for npm/nvm Codex CLI installs, menu bar readability, and weekly-window display.
 
+<p align="center">
+  <strong>Menu bar view</strong><br/>
+  Shows Claude Code and Codex remaining quota at a glance.
+  <br/><br/>
+  <img src=".github/assets/fork-menubar-remaining.png" alt="Menu bar showing remaining quota" width="116"/>
+  <br/><br/>
+  <strong>Popover details</strong><br/>
+  Shows 5-hour and weekly windows, reset times, refresh interval, display mode, and launch-at-login setting.
+  <br/><br/>
+  <img src=".github/assets/fork-popover-remaining.png" alt="Popover showing remaining quota" width="327"/>
+</p>
+
 ## Changes in This Fork
 
 - Prefer the stdio `codex app-server` flow and prepend the resolved Codex executable directory to the child process `PATH`, which helps npm/nvm installs whose `codex` command runs through `env node`.
@@ -22,18 +34,6 @@ For Windows, see [Headroom](https://github.com/tesuheee/headroom-ai-usage-monito
   <a href="https://github.com/tesuheee/headroom-ai-usage-monitor">
     <img src=".github/assets/headroom-overview.png" alt="Headroom Windows AI usage monitor" width="760"/>
   </a>
-</p>
-
-<p align="center">
-  <strong>Menu bar view</strong><br/>
-  Shows Claude Code and Codex remaining quota at a glance.
-  <br/><br/>
-  <img src=".github/assets/fork-menubar-remaining.png" alt="Menu bar showing remaining quota" width="116"/>
-  <br/><br/>
-  <strong>Popover details</strong><br/>
-  Shows 5-hour and weekly windows, reset times, refresh interval, display mode, and launch-at-login setting.
-  <br/><br/>
-  <img src=".github/assets/fork-popover-remaining.png" alt="Popover showing remaining quota" width="327"/>
 </p>
 
 ## Overview
