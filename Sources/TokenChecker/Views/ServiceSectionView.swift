@@ -49,7 +49,12 @@ struct ServiceSectionView: View {
     @ViewBuilder
     private func usageBlock(_ usage: ServiceUsage) -> some View {
         if let five = usage.fiveHour {
-            limitRow(label: L10n.tr("window.five_hour", language: language), limit: five, barHeight: 6)
+            limitRow(
+                label: L10n.tr("window.five_hour", language: language),
+                limit: five,
+                barHeight: 6,
+                percentWeight: .bold
+            )
         } else {
             Text(L10n.tr("window.five_hour.no_data", language: language))
                 .font(.system(size: 11))
@@ -57,14 +62,29 @@ struct ServiceSectionView: View {
         }
 
         if let weekly = usage.weekly {
-            limitRow(label: L10n.tr("window.weekly", language: language), limit: weekly, barHeight: 3)
+            limitRow(
+                label: L10n.tr("window.weekly", language: language),
+                limit: weekly,
+                barHeight: 1.5,
+                percentWeight: .regular
+            )
         }
         if let sonnet = usage.weeklySonnet {
-            limitRow(label: L10n.tr("window.weekly_sonnet", language: language), limit: sonnet, barHeight: 3)
+            limitRow(
+                label: L10n.tr("window.weekly_sonnet", language: language),
+                limit: sonnet,
+                barHeight: 1.5,
+                percentWeight: .regular
+            )
         }
     }
 
-    private func limitRow(label: String, limit: RateLimit, barHeight: CGFloat) -> some View {
+    private func limitRow(
+        label: String,
+        limit: RateLimit,
+        barHeight: CGFloat,
+        percentWeight: Font.Weight
+    ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label)
@@ -72,7 +92,7 @@ struct ServiceSectionView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text("\(displayMode.percent(for: limit))%")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 12, weight: percentWeight))
                     .foregroundStyle(displayMode.color(for: limit))
             }
             ProgressBarView(
