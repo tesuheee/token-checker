@@ -44,6 +44,7 @@ struct MenuBarLabel: View {
         }
         .padding(.horizontal, 2)
         .foregroundStyle(Color.primary)
+        .environment(\.colorScheme, effectiveColorScheme)
 
         let renderer = ImageRenderer(content: content)
         // ビットマップは高 DPI で焼いておく．image.size には触らない
@@ -67,5 +68,16 @@ struct MenuBarLabel: View {
         if v > 1.0 { return "100%+" }
         let clamped = max(0, v)
         return "\(Int((clamped * 100).rounded()))%"
+    }
+
+    private var effectiveColorScheme: ColorScheme {
+        let appearance = NSApp.effectiveAppearance
+        let match = appearance.bestMatch(from: [.darkAqua, .aqua, .vibrantDark, .vibrantLight])
+        switch match {
+        case .darkAqua, .vibrantDark:
+            return .dark
+        default:
+            return .light
+        }
     }
 }
