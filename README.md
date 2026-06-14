@@ -13,13 +13,9 @@ macOS のメニューバーに Claude Code と Codex の使用率を常時表示
 - 使用量 (0% → 100%) と残量 (100% → 0%) の表示を切り替える設定を追加。
 
 <p align="center">
-  <img src=".github/assets/menubar.svg" alt="メニューバー表示" width="640"/>
-</p>
-
-<p align="center">
   <img src=".github/assets/fork-popover-remaining.png" alt="残量表示のポップオーバー" width="327"/>
   <br/>
-  <img src=".github/assets/fork-menubar-remaining.png" alt="残量表示のメニューバー" width="264"/>
+  <img src=".github/assets/fork-menubar-remaining.png" alt="残量表示のメニューバー" width="116"/>
 </p>
 
 ## 概要
@@ -64,11 +60,6 @@ codex login
 ```
 
 いずれもブラウザの OAuth フローを経て、Keychain または `~/.codex/auth.json` にトークンが保存される。アプリは保存されたトークンを参照するため、ログインは CLI 側で 1 度行えばよい。
-
-
-<p align="center">
-  <img src=".github/assets/popover.svg" alt="ポップオーバー表示" width="320"/>
-</p>
 
 クリックで展開するポップオーバーには、5 時間ウィンドウと週次ウィンドウの使用率または残量、リセットまでの残時間、更新間隔（30 秒〜10 分、既定 5 分）、表示内容（使用量 / 残量）、ログイン時の自動起動トグルが含まれる。
 
@@ -122,12 +113,6 @@ A macOS menu bar application that displays Claude Code and Codex usage in real t
 
 This repository is a personal fork of [otoha1119/token-checker](https://github.com/otoha1119/token-checker). It keeps the original design and implementation as the base, with additional fixes for npm/nvm Codex CLI installs, menu bar readability, and weekly-window display.
 
-<p align="center">
-  <img src=".github/assets/fork-popover-remaining.png" alt="Popover showing remaining quota" width="327"/>
-  <br/>
-  <img src=".github/assets/fork-menubar-remaining.png" alt="Menu bar showing remaining quota" width="264"/>
-</p>
-
 ## Changes in This Fork
 
 - Prefer the stdio `codex app-server` flow and prepend the resolved Codex executable directory to the child process `PATH`, which helps npm/nvm installs whose `codex` command runs through `env node`.
@@ -135,6 +120,12 @@ This repository is a personal fork of [otoha1119/token-checker](https://github.c
 - Match the rendered menu bar label to the active macOS appearance so percentage text remains readable in dark menu bars.
 - Show bars for weekly windows. The 5-hour window remains visually primary, while weekly windows use thinner bars.
 - Add a display mode setting for used quota (0% to 100%) vs remaining quota (100% to 0%).
+
+<p align="center">
+  <img src=".github/assets/fork-popover-remaining.png" alt="Popover showing remaining quota" width="327"/>
+  <br/>
+  <img src=".github/assets/fork-menubar-remaining.png" alt="Menu bar showing remaining quota" width="116"/>
+</p>
 
 ## Overview
 
