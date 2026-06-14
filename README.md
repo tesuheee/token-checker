@@ -1,115 +1,8 @@
-# Token Checker 修正版 (fork)
-
-macOS のメニューバーに Claude Code と Codex の使用率を常時表示する macOS アプリケーション。
-
-このリポジトリは [otoha1119/token-checker](https://github.com/otoha1119/token-checker) を元にした個人用フォークです。オリジナル版の設計と実装をベースに、npm/nvm 版 Codex CLI での起動安定化、メニューバー表示の視認性改善、週次ウィンドウ表示の強化を加えています。
-
-## このフォークで追加した変更
-
-- npm/nvm 経由でインストールした Codex CLI でも `codex app-server` を起動しやすいよう、stdio 起動を優先し、`codex` と同じディレクトリを子プロセスの `PATH` に追加。
-- Codex RPC が `error` を返した場合、`missing result` ではなく実際のエラー内容を表示。
-- macOS のダークなメニューバー上でパーセンテージ文字が黒く潰れないよう、メニューバー画像生成時の color scheme を明示。
-- 週次ウィンドウにもバーを表示。5 時間ウィンドウを主指標として太く、週次ウィンドウを補助指標として細く表示。
-- 使用量 (0% → 100%) と残量 (100% → 0%) の表示を切り替える設定を追加。
-
-<p align="center">
-  <img src=".github/assets/fork-popover-remaining.png" alt="残量表示のポップオーバー" width="327"/>
-  <br/>
-  <img src=".github/assets/fork-menubar-remaining.png" alt="残量表示のメニューバー" width="116"/>
-</p>
-
-## 概要
-
-ターミナルで `claude login` / `codex login` を完了済みのアカウントに対し、Anthropic の OAuth エンドポイントおよび `codex app-server` の JSON-RPC を経由してレート制限情報を取得する。取得結果はメニューバーに 2 個のドーナツチャートと数値で表示され、クリックでポップオーバーに 5 時間ウィンドウと週次ウィンドウの詳細を展開する。
-
-## 動作要件
-
-| 項目 | 値 |
-| --- | --- |
-| macOS | 14 Sonoma 以上 |
-| Swift | 5.9 以上（Xcode Command Line Tools で可） |
-| Claude Code CLI | `claude login` 済み |
-| Codex CLI | `codex login` 済み |
-
-Claude Code と Codex のいずれかが欠けていても、もう一方は動作する。
-
-## インストール
-
-このリポジトリを clone した上で、自分のマシンでビルドして使うことを前提とする。
-
-```bash
-./Scripts/build.sh --install
-```
-
-ビルド時に Apple Development の署名 identity が見つからない場合は ad-hoc 署名が自動的に使われる。自分でビルドした `.app` はそのまま起動できる。
-
-インストール後は Finder の「アプリケーション」から `TokenChecker` を開くか、ターミナルから以下を実行して起動する。
-
-```bash
-open /Applications/TokenChecker.app
-```
-
-
-## 使用方法
-
-事前にターミナルで以下を実行し、両サービスにログインしておく。
-
-```bash
-claude login
-codex login
-```
-
-いずれもブラウザの OAuth フローを経て、Keychain または `~/.codex/auth.json` にトークンが保存される。アプリは保存されたトークンを参照するため、ログインは CLI 側で 1 度行えばよい。
-
-クリックで展開するポップオーバーには、5 時間ウィンドウと週次ウィンドウの使用率または残量、リセットまでの残時間、更新間隔（30 秒〜10 分、既定 5 分）、表示内容（使用量 / 残量）、ログイン時の自動起動トグルが含まれる。
-
-## データ取得経路
-
-- **Claude**: `/usr/bin/security` 経由で Keychain (`Claude Code-credentials`) から OAuth アクセストークンを取得し、`https://api.anthropic.com/api/oauth/usage` に対して `anthropic-beta: oauth-2025-04-20` ヘッダー付きで GET する。
-- **Codex**: `codex` バイナリを子プロセスとして起動し、行区切り JSON-RPC 経由で `account/rateLimits/read` を呼ぶ。バイナリの場所は Homebrew / nodebrew / nvm / volta / asdf / fnm 等の主要なインストール先を順に探索し、見つからない場合はログインシェル経由で `command -v codex` を解決する。`UserDefaults` の `codexPath` キーで手動指定も可能 (`defaults write com.token-checker.app codexPath /abs/path/codex`)。起動コマンドは `codex app-server` 単体形式を先に試し、必要な場合だけ `codex app-server daemon start` + `codex app-server proxy` 形式へフォールバックする。npm/nvm 版の `codex` が `env node` 経由で動く場合に備え、解決した `codex` と同じディレクトリを子プロセスの `PATH` に追加する。
-
-## アップデート
-
-最新のソースを取得して再ビルドする。
-
-```bash
-git pull
-./Scripts/build.sh --install
-```
-
-既存のアプリは自動的に上書きされる。設定 (ポーリング間隔、表示内容、ログイン時の自動起動) は UserDefaults に保存されているため引き継がれる。アプリが既に起動中の場合はメニューバーの「終了」で一度落としてから再度開く。
-
-## アンインストール
-
-```bash
-killall TokenChecker
-defaults delete com.token-checker.app 2>/dev/null
-```
-
-## ライセンス
-
-本ソフトウェアは [MIT License](./LICENSE) で配布される。
-なお「Anthropic」「Claude」「Codex」は各社の商標であり、本ソフトウェアは Anthropic および OpenAI の公式プロダクトではなく、両社による承認・推奨を受けたものでもない。
-
-## 免責事項
-
-本ソフトウェアは現状有姿 (as-is) で提供されるものであり、動作・安全性・正確性について一切の保証を行わない。本ソフトウェアの利用に起因して発生したいかなる損害 (データ損失、アカウント停止、トークン漏洩、セキュリティインシデント等を含むがこれに限らない) についても、作者は一切の責任を負わない。利用者自身の責任において使用すること。
-
-## 謝辞
-
-このフォークは [otoha1119/token-checker](https://github.com/otoha1119/token-checker) を元にしています。オリジナル版の作者とコントリビューターに感謝します。
-
-UI のデザインは [s-age/ccmeter](https://github.com/s-age/ccmeter)（MIT License）を参考にした。MIT ライセンスは [`LICENSE`](./LICENSE) に同梱している。
-
-<br>
-
----
-
-<br>
-
 # Token Checker Fixed Fork
 
-A macOS menu bar application that displays Claude Code and Codex usage in real time.
+[日本語版はこちら](./README.ja.md)
+
+A macOS menu bar app that displays Claude Code and Codex usage in real time.
 
 This repository is a personal fork of [otoha1119/token-checker](https://github.com/otoha1119/token-checker). It keeps the original design and implementation as the base, with additional fixes for npm/nvm Codex CLI installs, menu bar readability, and weekly-window display.
 
@@ -169,12 +62,14 @@ codex login
 
 Each uses a browser-based OAuth flow that saves a token to Keychain or `~/.codex/auth.json`. The app reads the saved tokens, so you only need to log in once via the CLI.
 
-The popover (opened by clicking the menu bar item) shows 5-hour and weekly window usage or remaining quota, reset countdowns, a refresh-interval picker (30 seconds to 10 minutes, default 5 minutes), a display mode picker, and a launch-at-login toggle.
+The popover shows 5-hour and weekly window usage or remaining quota, reset countdowns, a refresh-interval picker, a display mode picker, and a launch-at-login toggle.
 
 ## Data Sources
 
 - **Claude**: retrieves the OAuth access token from Keychain (`Claude Code-credentials`) via `/usr/bin/security`, then issues a GET request to `https://api.anthropic.com/api/oauth/usage` with the `anthropic-beta: oauth-2025-04-20` header.
-- **Codex**: spawns the `codex` binary as a subprocess and calls `account/rateLimits/read` via line-delimited JSON-RPC. The binary is discovered by probing common install locations (Homebrew, nodebrew, nvm, volta, asdf, fnm, ...) and falling back to `command -v codex` via the user's login shell. A manual override is available via the `UserDefaults` `codexPath` key (`defaults write com.token-checker.app codexPath /abs/path/codex`). The app tries the single-arg `codex app-server` form first, then falls back to `codex app-server daemon start` + `codex app-server proxy` when needed. For npm/nvm installs whose `codex` shim requires `node`, the resolved Codex executable directory is prepended to the child process `PATH`.
+- **Codex**: spawns the `codex` binary as a subprocess and calls `account/rateLimits/read` via line-delimited JSON-RPC. The binary is discovered by probing common install locations and falling back to `command -v codex` via the user's login shell. A manual override is available via the `UserDefaults` `codexPath` key: `defaults write com.token-checker.app codexPath /abs/path/codex`.
+
+The app tries `codex app-server` first, then falls back to `codex app-server daemon start` plus `codex app-server proxy` when needed. For npm/nvm installs whose `codex` shim requires `node`, the resolved Codex executable directory is prepended to the child process `PATH`.
 
 ## Updating
 
@@ -185,7 +80,7 @@ git pull
 ./Scripts/build.sh --install
 ```
 
-The existing app is overwritten in place. Settings (polling interval, display mode, launch-at-login) persist via UserDefaults. If the app is already running, quit it from the menu bar item first, then relaunch.
+The existing app is overwritten in place. Settings such as polling interval, display mode, and launch-at-login persist via UserDefaults. If the app is already running, quit it from the menu bar item first, then relaunch.
 
 ## Uninstall
 
@@ -202,7 +97,7 @@ Distributed under the [MIT License](./LICENSE).
 
 ## Disclaimer
 
-This software is provided "as is", without warranty of any kind regarding operation, safety, or accuracy. The author assumes no responsibility for any damages (including but not limited to data loss, account suspension, token leakage, or security incidents) arising from use of this software. Use at your own risk.
+This software is provided "as is", without warranty of any kind regarding operation, safety, or accuracy. Use it at your own risk.
 
 ## Acknowledgments
 
