@@ -2,13 +2,18 @@
 "error.anthropic_rate_limited" = "Anthropic API 已达到速率限制（429）。将等到下次轮询再试。";
 "error.anthropic_rate_limited_with_retry" = "Anthropic API 已达到速率限制。约 %d 分钟后自动重试。";
 "error.anthropic_unauthorized" = "Anthropic 认证错误（401）。请重新运行 `claude login`。";
+"error.codex_auth_missing" = "未找到 Codex 认证信息。请在终端运行 `codex login`。";
 "error.codex_cli_not_found" = "未找到 Codex CLI。请运行 `npm i -g @openai/codex`。";
 "error.codex_daemon_failed" = "codex app-server daemon start 失败（退出码=%d）";
 "error.codex_daemon_spawn_failed" = "codex app-server daemon start 启动失败：%@";
 "error.codex_daemon_timeout" = "codex app-server daemon start 超时（5 秒）";
+"error.codex_http" = "Codex API 错误（状态 %d）";
 "error.codex_process_exited" = "codex app-server 已退出。正在尝试重启。";
+"error.codex_rate_limited" = "Codex API 已达到速率限制（429）。将等到下次轮询再试。";
+"error.codex_rate_limited_with_retry" = "Codex API 已达到速率限制。约 %d 分钟后自动重试。";
 "error.codex_rpc" = "Codex RPC 错误：%@";
 "error.codex_start_failed" = "codex app-server 启动失败：%@";
+"error.codex_unauthorized" = "Codex 认证错误。请重新运行 `codex login`。";
 "error.decoding" = "响应解码失败：%@";
 "display_mode.remaining" = "剩余";
 "display_mode.used" = "用量";

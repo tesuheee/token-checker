@@ -5,6 +5,10 @@ enum DomainError: Error, Equatable, LocalizedError, Sendable {
     case anthropicUnauthorized
     case anthropicRateLimited(retryAfter: TimeInterval?)
     case anthropicHTTP(status: Int)
+    case codexAuthMissing
+    case codexUnauthorized
+    case codexRateLimited(retryAfter: TimeInterval?)
+    case codexHTTP(status: Int)
     case codexCLINotFound
     case codexProcessExited
     case codexRPCError(message: String)
@@ -35,6 +39,18 @@ enum DomainError: Error, Equatable, LocalizedError, Sendable {
             return L10n.tr("error.anthropic_rate_limited", language: language)
         case .anthropicHTTP(let status):
             return L10n.format("error.anthropic_http", language: language, status)
+        case .codexAuthMissing:
+            return L10n.tr("error.codex_auth_missing", language: language)
+        case .codexUnauthorized:
+            return L10n.tr("error.codex_unauthorized", language: language)
+        case .codexRateLimited(let retryAfter):
+            if let sec = retryAfter {
+                let mins = max(1, Int((sec / 60).rounded()))
+                return L10n.format("error.codex_rate_limited_with_retry", language: language, mins)
+            }
+            return L10n.tr("error.codex_rate_limited", language: language)
+        case .codexHTTP(let status):
+            return L10n.format("error.codex_http", language: language, status)
         case .codexCLINotFound:
             return L10n.tr("error.codex_cli_not_found", language: language)
         case .codexProcessExited:

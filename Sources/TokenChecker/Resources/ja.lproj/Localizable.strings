@@ -2,13 +2,18 @@
 "error.anthropic_rate_limited" = "Anthropic API のレート制限 (429)。次回ポーリングまで待機します。";
 "error.anthropic_rate_limited_with_retry" = "Anthropic API のレート制限に達しました。約 %d 分後に自動で再試行します。";
 "error.anthropic_unauthorized" = "Anthropic からの認証エラー (401)。`claude login` で再ログインしてください。";
+"error.codex_auth_missing" = "Codex の認証情報が見つかりません。ターミナルで `codex login` を実行してください。";
 "error.codex_cli_not_found" = "Codex CLI が見つかりません。`npm i -g @openai/codex` を実行してください。";
 "error.codex_daemon_failed" = "codex app-server daemon start に失敗しました (exit=%d)";
 "error.codex_daemon_spawn_failed" = "codex app-server daemon start の起動に失敗しました: %@";
 "error.codex_daemon_timeout" = "codex app-server daemon start がタイムアウトしました (5s)";
+"error.codex_http" = "Codex API エラー (status %d)";
 "error.codex_process_exited" = "codex app-server が終了しました。再起動を試みます。";
+"error.codex_rate_limited" = "Codex API のレート制限 (429)。次回ポーリングまで待機します。";
+"error.codex_rate_limited_with_retry" = "Codex API のレート制限に達しました。約 %d 分後に自動で再試行します。";
 "error.codex_rpc" = "Codex RPC エラー: %@";
 "error.codex_start_failed" = "codex app-server の起動に失敗しました: %@";
+"error.codex_unauthorized" = "Codex の認証エラーです。`codex login` で再ログインしてください。";
 "error.decoding" = "レスポンスのデコードに失敗: %@";
 "display_mode.remaining" = "残量";
 "display_mode.used" = "使用量";
