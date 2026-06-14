@@ -16,6 +16,12 @@ macOS のメニューバーに Claude Code と Codex の使用率を常時表示
   <img src=".github/assets/menubar.svg" alt="メニューバー表示" width="640"/>
 </p>
 
+<p align="center">
+  <img src=".github/assets/fork-popover-remaining.png" alt="残量表示のポップオーバー" width="327"/>
+  <br/>
+  <img src=".github/assets/fork-menubar-remaining.png" alt="残量表示のメニューバー" width="264"/>
+</p>
+
 ## 概要
 
 ターミナルで `claude login` / `codex login` を完了済みのアカウントに対し、Anthropic の OAuth エンドポイントおよび `codex app-server` の JSON-RPC を経由してレート制限情報を取得する。取得結果はメニューバーに 2 個のドーナツチャートと数値で表示され、クリックでポップオーバーに 5 時間ウィンドウと週次ウィンドウの詳細を展開する。
@@ -115,6 +121,12 @@ UI のデザインは [s-age/ccmeter](https://github.com/s-age/ccmeter)（MIT Li
 A macOS menu bar application that displays Claude Code and Codex usage in real time.
 
 This repository is a personal fork of [otoha1119/token-checker](https://github.com/otoha1119/token-checker). It keeps the original design and implementation as the base, with additional fixes for npm/nvm Codex CLI installs, menu bar readability, and weekly-window display.
+
+<p align="center">
+  <img src=".github/assets/fork-popover-remaining.png" alt="Popover showing remaining quota" width="327"/>
+  <br/>
+  <img src=".github/assets/fork-menubar-remaining.png" alt="Menu bar showing remaining quota" width="264"/>
+</p>
 
 ## Changes in This Fork
 
