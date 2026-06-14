@@ -1,6 +1,6 @@
-# Token Checker 修正版 (fork)
+[English](./README.md) [日本語](./README.ja.md)
 
-[英語版はこちら](./README.md)
+# Token Checker 修正版 (fork)
 
 macOS のメニューバーに Claude Code と Codex の使用率を常時表示する macOS アプリケーションです。
 
@@ -15,9 +15,9 @@ macOS のメニューバーに Claude Code と Codex の使用率を常時表示
 - 使用量 (0% → 100%) と残量 (100% → 0%) の表示を切り替える設定を追加。
 
 <p align="center">
-  <img src=".github/assets/fork-popover-remaining.png" alt="残量表示のポップオーバー" width="327"/>
-  <br/>
   <img src=".github/assets/fork-menubar-remaining.png" alt="残量表示のメニューバー" width="116"/>
+  <br/>
+  <img src=".github/assets/fork-popover-remaining.png" alt="残量表示のポップオーバー" width="327"/>
 </p>
 
 ## 概要

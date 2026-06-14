@@ -1,6 +1,6 @@
-# Token Checker Fixed Fork
+[English](./README.md) [日本語](./README.ja.md)
 
-[日本語版はこちら](./README.ja.md)
+# Token Checker Fixed Fork
 
 A macOS menu bar app that displays Claude Code and Codex usage in real time.
 
@@ -15,9 +15,9 @@ This repository is a personal fork of [otoha1119/token-checker](https://github.c
 - Add a display mode setting for used quota (0% to 100%) vs remaining quota (100% to 0%).
 
 <p align="center">
-  <img src=".github/assets/fork-popover-remaining.png" alt="Popover showing remaining quota" width="327"/>
-  <br/>
   <img src=".github/assets/fork-menubar-remaining.png" alt="Menu bar showing remaining quota" width="116"/>
+  <br/>
+  <img src=".github/assets/fork-popover-remaining.png" alt="Popover showing remaining quota" width="327"/>
 </p>
 
 ## Overview
